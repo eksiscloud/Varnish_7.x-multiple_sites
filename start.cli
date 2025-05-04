@@ -1,3 +1,17 @@
+vcl.load vcl-matomo /etc/varnish/sites/matomo.vcl
+vcl.load vcl-devone /etc/varnish/sites/dev.eksis.vcl
+vcl.load vcl-jagsterone /etc/varnish/sites/jagster.eksis.vcl
+vcl.load vcl-eksis /etc/varnish/sites/eksis.one.vcl
+vcl.load vcl-selko /etc/varnish/sites/selko.katiska.vcl
+vcl.load vcl-store /etc/varnish/sites/store.katiska.vcl
+vcl.load vcl-katiska /etc/varnish/sites/katiska.eu.vcl
+vcl.label label-stats vcl-matomo
+vcl.label label-dev vcl-devone
+vcl.label label-jagster vcl-jagsterone
+vcl.label label-eksisone vcl-eksis
+vcl.label label-selkokatiska vcl-selko
+vcl.label label-katiskastore vcl-store
+vcl.label label-katiska vcl-katiska
 vcl.load default-zero /etc/varnish/default.vcl
 vcl.load emergency /etc/varnish/emergency.vcl
 vcl.use default-zero
