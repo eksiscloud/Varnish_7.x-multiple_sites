@@ -33,6 +33,18 @@ import accept;		# Fix Accept-Language
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
+# Human's user agent
+include "/etc/varnish/ext/user-ua.vcl";
+
+# Tools and libraries
+include "/etc/varnish/ext/probes.vcl";
+
+# Bots with purpose
+include "/etc/varnish/ext/nice-bot.vcl";
+
+# Manipulating some urls
+include "/etc/varnish/ext/manipulate.vcl";
+
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
 ## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
@@ -72,7 +84,7 @@ backend sites {
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
-
+ 
 # This can do almost everything
 acl whitelist {
 	"localhost";
@@ -124,15 +136,20 @@ sub vcl_init {
 
 sub vcl_recv {
 	
-	### pass/pipe here are varnish-wide
-	## Heads up: general ones, as plain return(pipe); doesn't work with multiple backends without
-	## declaring backend
-	
-	## Your lifeline: Turn OFF cache (everything else happends, though)
-	# return(pass);
-	
-	## Your last hope: a dumb TCP termination. It passes everything right thru Varnish from this point.
+	set req.backend_hint = sites;
+
+	## just for this virtual host
+	# for stop caching uncomment
+	#return(pass);
+	# for dumb TCL-proxy uncomment
 	return(pipe);
+	
+	
+	## Normalize hostname to avoid double caching
+	# I like to keep triple-w
+	set req.http.host = regsub(req.http.host,
+	"^katiska\.eu$", "www.katiska.eu");
+	
 	
 	### The work starts here
 	###
@@ -171,10 +188,10 @@ sub vcl_recv {
 
 	## It will terminate badly formed requests
 	## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
-	#if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
-	#	# In HTTP/1.1, Host is required.
-	#	return (synth(400));
-	#}
+	if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+		# In HTTP/1.1, Host is required.
+		return (synth(400));
+	}
 
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
@@ -194,8 +211,6 @@ sub vcl_recv {
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
 	set req.http.accept-language = lang.filter(req.http.accept-language);
-	
-################################## mark for editing
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
@@ -214,16 +229,7 @@ sub vcl_recv {
 	if (req.http.x-bot != "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
-	
-	# Now we stop known useless ones who's not from whitelisted IPs using bad-bot.vcl
-	# This should not be active if Nginx do what it should do because I have bot filtering there
-	#if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
-	#	if (req.http.x-bot != "(visitor|tech|nice)") {
-			# ext/filtering/bad-bot.vcl
-	#		call bad_bot_detection;
-	#	}
-	#}
-	
+		
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
 	# There is big chance it is bot/scraper, but we have false identifications anyway. 
@@ -231,26 +237,6 @@ sub vcl_recv {
                 set req.http.x-user-agent = "Unlisted: " + req.http.User-Agent;
 		set req.http.x-bot = "visitor";
         }
-
-	## Stop bots and knockers seeking holes using 403.vcl
-	# I don't let search agents and similar to forbidden urls. Otherwise Fail2ban would ban theirs IPs too.
-	# I get error for testing purposes, but Fail2ban has whitelisted my IP.
-	# Heads up: this war never ends and using Varnish for this eats RAM.
-	# Perhaps this should be job for Nginx and giving 444?
-#	if (req.http.x-bot != "(nice|visitor)") {
-#		# ext/filtering/403.vvl	
-#		call stop_pages;
-#	}
-	
-	## Slowing down if someone makes too many requests too fast
-	# These values are way too low. Only one visit at WordPress will trigger it.
-	# Using IP as client.identity is mostly bad idea and it affects to real honest users, not bots.
-	# 15 requests in a 10 second timeframe. If that rate is exceeded, the user gets blocked for 30 seconds.
-	# I never got any good values, so I don't use throttle. This is just an example.
-	#set client.identity = std.ip(req.http.X-Real-IP, "0.0.0.0");
-	#if (vsthrottle.is_denied(client.identity, 15, 10s, 30s)) {
-	#	return(synth(429, "Too Many Requests. You can retry in " + vsthrottle.blocked(client.identity, 15, 10s, 30s) + " seconds."));
-	#} 
 
 	## Let's tune up a bit behavior for healthy backends: Cap grace to 12 hours
 	if (std.healthy(req.backend_hint)) {
@@ -274,46 +260,262 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "\?&", "?");
 		set req.url = regsub(req.url, "\?$", "");
 	}
-	
-	## All these affects only browsers and backend just doesn't care. No need to waste time and energy to clean these.
-	
-	# Strip querystring ?nocache, 3rd party doesn't tell when caching or not
-	#set req.url = regsuball(req.url, "\?nocache", "");
-	
-	# Strip a plain HTML anchor #, server doesn't need it.
-	#if (req.url ~ "\#") {
-	#	set req.url = regsub(req.url, "\#.*$", "");
-	#}
-
-	# Strip a trailing ? if it exists 
-	#if (req.url ~ "\?$") {
-	#	set req.url = regsub(req.url, "\?$", "");
-	#}
-	
+		
 	## URL changes by ext/redirect/manipulate.vcl, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
 		call new_direction;
 	}
 	
-	## Awstats needs the host. I don't use it anymore, so this is just another example 
-	## You must add something like this in systemctl edit --full varnishncsa at line StartExec:
-	## -F '%%{X-Forwarded-For}i %%{VCL_Log:X-Req-Host}x %%l %%u %%t "%%r" %%s %%b "%%{Referer}i" "%%{User-agent}i"'
-	#set req.http.X-Req-Host = req.http.host;
-	#std.log("X-Req-Host:" + req.http.X-Req-Host);
-
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
 	## so that backend doesn’t add CORS headers.
 	set req.http.X-Saved-Origin = req.http.Origin;
 	unset req.http.Origin;
 
-	## I'm normalizing language
-	set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
-
 	## Send Surrogate-Capability headers to announce ESI support to backend
 	# I don't understand at all what this is doing
 	set req.http.Surrogate-Capability = "key=ESI/1.0";
+	
+	## Who can do BAN, PURGE and REFRESH and how
+	# Remember to use capitals when doing, size matters...
+	
+	if (req.method == "BAN|PURGE|REFRESH") {
+               if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+                       return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
+		}
+		
+		# BAN needs a pattern:
+		# curl -X BAN -H "X-Ban-Request:^/contact" "www.example.com"
+		# varnishadm ban obj.http.Content-Type ~ ^image/
+		if (req.method == "BAN") {
+			if(!req.http.x-ban-request) {
+				return(synth(400,"Missing x-ban header"));
+			}
+			ban("req.url ~ " 
+			+ req.http.x-ban-request
+			+ " && req.http.host == " 
+			+ req.http.host);
+				# Throw a synthetic page so the request won't go to the backend
+				return (synth(200,"Ban added"));
+		}
+	
+		# soft/hard purge
+#		if (req.method == "PURGE") {
+#			if(!req.http.x-xkey-purge) {
+#				return(hash);
+#			}
+#			set req.http.x-purges = xkey.purge(req.http.x-xkey-purge);
+#			if (std.integer(req.http.x-purges,0) != 0) {
+#				return(synth(200, req.http.x-purges + " objects purged"));
+#			} else {
+#				return(synth(404, "Key not found"));
+#			}
+#		}
+		
+		# Hit-always-miss - Old content will be updated with fresh one.
+		if (req.method == "REFRESH") {
+			set req.method = "GET";
+			set req.hash_always_miss = true;
+		}
+	}
+	
+	# This just an example how to ban objects or purge all when country codes come from backend
+	#if (req.method == "PURGE") {
+	#	if (!std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
+	#		return (synth(405, "Purging not allowed for " + req.http.X-Real-IP));
+	#	}
+		# Backend gave X-Country-Code to indicate clearing of specific geo-variation
+	#	if (req.http.X-Country-Code) {
+	#		set req.method = "GET";
+	#		set req.hash_always_miss = true;
+	#	} else {
+			# clear all geo-variants of this page
+	#		return (purge);
+	#		}
+	#	} else {
+	#		set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	#		set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);    
+	#		if (req.http.X-Country-Code !~ "(fi|se)") {
+	#			set req.http.X-Country-Code = "fi";
+	#	}
+	#}
+	
+	## Only deal with "normal" types
+	# In-build rules. Those aren't needed, unless return(...) forces skip it.
+	# Heads up! BAN/PURGE/REFRESH must be done before this or declared here. Unless those don't work when purging or banning.
+	if (req.method != "GET" &&
+	req.method != "HEAD" &&
+	req.method != "PUT" &&
+	req.method != "POST" &&
+	req.method != "TRACE" &&
+	req.method != "OPTIONS" &&
+	req.method != "PATCH" &&
+	req.method != "DELETE"
+	) {
+	# Non-RFC2616 or CONNECT which is weird.
+	# Why send the packet upstream, while the visitor is using a non-valid HTTP method?
+		return(synth(405, "Non-valid HTTP method!"));
+	}
+	
+	## Only GET and HEAD are cacheable methods AFAIK
+        # In-build rule, doesn't needed here
+        if (req.method != "GET" && req.method != "HEAD") {
+                return(pass);
+        }
 
-	## At this point we jump to all-cookies.vcl
+	## Keeping needed cookies and deleting rest.
+	# You don't need to hash with every cookie. You can do something like this too:
+	# sub vcl_hash {
+	#	hash_data(cookie.get("language"));
+	# }
+	cookie.parse(req.http.cookie);
+	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
+	# But why _pk_ cookies passes?
+	cookie.delete("wordpress_test_Cookie,_pk_");
+	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass,woocommerce_cart_hash,woocommerce_items_in_cart,wp_woocommerce_session_");
+	set req.http.cookie = cookie.get_string();
+
+	# Don' let empty cookies travel any further
+	if (req.http.cookie == "") {
+		unset req.http.cookie;
+	}
+
+	## Auth requests shall be passed
+	# In-build rule. doesn't needed here.
+	if (req.http.Authorization || req.http.Cookie) {
+		return(pass);
+	}
+	
+	## Do not cache AJAX requests.
+	if (req.http.X-Requested-With == "XMLHttpRequest") {
+		return(pass);
+	}
+	
+	## Enable smart refreshing, aka. ctrl+F5 will flush that page
+	# Remember your header Cache-Control must be set something else than no-cache
+	# Otherwise everything will miss
+	if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
+		set req.hash_always_miss = true;
+	}
+	
+	## Page that Monit will ping
+	# Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
+	# 200 OK is same as pass
+#	if (req.url == "^/monit-zxcvb") {
+#		return(synth(200, "OK"));
+#	}
+	
+	## Adsense incomings are lower when Varnish is on, trying to solve out this
+	# is it because of caching or CSP-rules?
+	if (req.url ~ "adsbygoogle") {
+		return(pass);
+	}
+
+	## Implementing websocket support
+	if (req.http.Upgrade ~ "(?i)websocket") {
+		return(pipe);
+	}
+
+	## Cache warmup
+	# wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer" -H --domains=example.com --show-progress www.example.com
+	# It saves a lot of directories, so think where you are before launching it... A protip: /tmp
+	if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
+		return(pass);
+	}
+	
+	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read the file first.
+	# The job will be done at vcl_backend_response
+	# But is this really needed nowadays?
+	if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
+		unset req.http.cookie;
+		return(hash);
+	}
+
+	## Cache all static files by Removing all Cookies for static files
+	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
+	if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
+		unset req.http.cookie;
+		return(hash);
+	}
+	
+	## Let's clean User-Agent, just to be on safe side
+	# It will come back at vcl_hash, but without separate cache
+	# I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve bots other nice ones 
+	# and 404 from real users must fix right away
+	set req.http.x-agent = req.http.User-Agent;
+	if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
+	unset req.http.User-Agent;
+
+	### Only for Wordpresses
+	
+	## I have strange redirection issue with all WordPresses
+	# Must be a problem with cookies/caching/nonce, but I don't understand how.
+	# It might be somekind conflict between/from plugins too.
+	# So, I'm taking a short road here
+	if (
+		   req.url ~ "&_wpnonce"
+		|| req.url ~ "&reauth=1"
+		|| req.url ~ "&redirect_to"
+		|| req.url ~ "\?gf-download"
+		) {
+			return(pipe);
+		}
+	
+	## admin-ajax can be a little bit faster, sometimes, but only if GET
+	# This must be before passing wp-admin
+	if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+		return (hash);
+	}
+	
+	# Some devices, mainly from Apple, send urls ending /null
+	if (req.url ~ "/null$") {
+		set req.url = regsub(req.url, "/null", "/");
+	}
+	
+	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
+	# Backend of Wordpress
+	if (req.url ~ "^/wp-admin/") { return(pipe); }
+
+
+	if (req.url ~ "/wp-(login|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+		return(pass);
+	}
+
+	## Don't cache logged-in user, password reseting and posts behind password
+	# Frontend of Wordpress
+	if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
+		return(pass);
+	}
+	
+	## I don't want to fill RAM for benefits of bots.
+	# This could be more general too, or is this smart move at all?
+	if (req.url ~ "^/wp-json/") {
+		return(pass);
+	}
+
+	## Normalize the query arguments.
+	# 'If...' structure is for Wordpress, so change/add something else when needed
+	# If std.querysort is any earlier it will break things, like giving error 500 when logging out. For me anyway, but I have some other issues with logging out too.
+#	if (req.url !~ "(wp-admin|wp-login|wp-json)") {
+#		set req.url = std.querysort(req.url);
+#	}
+
+	## Don't cache wordpress related pages
+	if (req.url ~ "(signup|activate|mail|logout)") {
+		return(pass);
+	}
+
+	## Must Use plugins I reckon
+	if (req.url ~ "/mu-.*") {
+		return(pass);
+	}
+
+	## Hit everything else
+	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
+	# Again, 'tuote' is product in finnish
+	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|cart|my-account|wc-api|checkout|addons|loggedout|lost-password|tuote)") {
+		unset req.http.cookie;
+	}
+	
 } 
 
 
