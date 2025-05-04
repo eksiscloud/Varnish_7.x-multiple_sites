@@ -27,11 +27,11 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-import accept;		# Fix Accept-Language
+#import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
-include "/etc/varnish/ext/filtering/asn.vcl";
+include "/etc/varnish/ext/asn.vcl";
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
@@ -109,9 +109,8 @@ sub vcl_init {
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
-	## This normalize Accept-Language header
-	## Note for me: I'm filtering UAs using language; remember to fix those
-	new lang = accept.rule("fi");
+	## This normalizes Accept-Language header too.
+	#new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
@@ -135,8 +134,6 @@ sub vcl_recv {
 	
 	## Your last hope: a dumb TCP termination. It passes everything right thru Varnish from this point.
 	return(pipe);
-
-######################################### just marker for editing
 	
 	### The work starts here
 	###
@@ -149,23 +146,20 @@ sub vcl_recv {
 
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
-		# Let's tell backends to certbot before pipe
-	#	if (req.http.host != "git.eksis.one") {
-			set req.backend_hint = sites;
-			return(pipe);
-	#	} else {
-	#		set req.backend_hint = gitea;
-	#			return(pipe);
-	#	}
+		set req.backend_hint = sites;
+		return(pipe);
 	}
 
 
-	## Redirecting http/80 to https/443, except git.eksis.one
+	## Redirecting http/80 to https/443
 	## This could, and perhaps should, do on Nginx but certbot likes this better
+	## I assume this could be done in default.vcl too but I don't know if
+	## X-Forwarded-Proto would come here then
 	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
 	(req.http.Scheme && req.http.Scheme != "https")) {
 		return(synth(750));
 	}
+
 	# if there is PROXY in use
 	# Used with Hitch or similar dumb ones 
 	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
@@ -187,15 +181,10 @@ sub vcl_recv {
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
 	
-	## I must clean up some trashes
-	# I should not use return(...) statement here because it passes everything, 
-	# but I want stop trashes right away so it doesn't matter
-
-	## Just an example how to do geo-blocking by VMOD.
+	## Geo-blocking, because I can
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	# I don't like capital letters
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
@@ -211,16 +200,12 @@ sub vcl_recv {
 	}
 	
 	# Quite often russians lie origin country, but are declaring russian as language
-	if (req.http.accept-language ~
-                "(ru_RU|ru-RU|ru$)"
+	if (req.http.Accept-Language ~
+                "(ru)"
 	) {
-                std.log("banned language: " + req.http.accept-language);
-		return(synth(403, "Unsupported language: " + req.http.accept-language));
+                std.log("banned language: " + req.http.Accept-Language);
+		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
 	}
-
-	# passing.vcl
-        # for sites thar I want to give pipe from this point, like e-commerce
-        call fastline;
 
 	## I can block service provider too using geoip-VMOD.
 	# 1st: Finding out and normalizing ASN
@@ -235,6 +220,8 @@ sub vcl_recv {
 	# ext/filtering/asn.vcl
 	call asn_name;
 	
+################################## mark for editing
+
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
         # ext/filtering/user-ua.vcl
