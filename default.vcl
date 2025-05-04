@@ -17,7 +17,7 @@
 vcl 4.1;
 
 # native ones
-import std;		# Load the std, not STD for god sake
+###import std;		# Load the std, not STD for god sake
 ###import cookie;		# Load the cookie, former libvmod-cookie
 ###import purge;		# Soft/hard purge by Varnish 7.x
 
@@ -202,9 +202,6 @@ acl whitelist {
 	"127.0.0.1";
 	"157.180.74.208";
 	"85.76.80.163";
-	"159.65.120.229";
-	"64.225.73.149";
-        "37.27.18.60";
 }
 
 # WP Rocket needs access for purging, if in use... I don't use anymore, it was just so big issue all the time
@@ -233,10 +230,11 @@ sub vcl_init {
 	new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
 	new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
 	
+	### to remove
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
 	## Note for me: I'm filtering UAs using language; remember to fix those
-	new lang = accept.rule("fi");
+	#new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
