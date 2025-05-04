@@ -128,19 +128,20 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 ## You can check if a backend is  healthy or sick:
 ## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
 
-probe sondi {
+### probes will be removed
+#probe sondi {
     #.url = "/index.html";  # or you can use just an url
 	# you must have installed libwww-perl:
-    .request =
-      "HEAD / HTTP/1.1"
-      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-      "Connection: close"
-      "User-Agent: Varnish Health Probe";
-	.timeout = 5s;
-	.interval = 4s;
-	.window = 5;
-	.threshold = 3;
-}
+#    .request =
+#      "HEAD / HTTP/1.1"
+#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+#      "Connection: close"
+#      "User-Agent: Varnish Health Probe";
+#	.timeout = 5s;
+#	.interval = 4s;
+#	.window = 5;
+#	.threshold = 3;
+#}
 
 #probe sondi-git {
 #    .request =
@@ -162,16 +163,22 @@ probe sondi {
 
 ## Backend tells where a site can be found
 
-# Mostly WordPress
-backend sites {
-	.host = "127.0.0.1";
-	.port = "8282";
-	.max_connections = 5000;
-	.first_byte_timeout = 300s;
-	.connect_timeout = 300s;
-	.between_bytes_timeout = 300s;
-	.probe = sondi;
+# fake, never-used backend to silence the compiler
+backend fake {
+	.host = "0:0";
 }
+
+### All real backend will be removed
+# Mostly WordPress
+#backend sites {
+#	.host = "127.0.0.1";
+#	.port = "8282";
+#	.max_connections = 5000;
+#	.first_byte_timeout = 300s;
+#	.connect_timeout = 300s;
+#	.between_bytes_timeout = 300s;
+#	.probe = sondi;
+#}
 
 # git.eksis.one by Gitea
 #backend gitea {
