@@ -18,8 +18,8 @@ vcl 4.1;
 
 # native ones
 import std;		# Load the std, not STD for god sake
-import cookie;		# Load the cookie, former libvmod-cookie
-import purge;		# Soft/hard purge by Varnish 7.x
+###import cookie;		# Load the cookie, former libvmod-cookie
+###import purge;		# Soft/hard purge by Varnish 7.x
 
 # from geoip package, needs separate compiling per Varnish version
 import geoip2;		# Load the GeoIP2 by MaxMind
@@ -27,79 +27,102 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-import accept;		# Fix Accept-Language
+###import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 ## I'm using sub-vcls only to keep default.vcl a little bit easier to read
 
+### to remove
 # Move to pipe;
-include "/etc/varnish/passing.vcl";
+#include "/etc/varnish/passing.vcl";
 
+### to remove
 # Old host to new one
 #include "/etc/varnish/ext/redirect/301hosts.vcl";
 
+### to remove
 # All common vcl_recv
-include "/etc/varnish/ext/common.vcl";
+#include "/etc/varnish/ext/common.vcl";
 
+### to remove
 # Wordpress stuff
-include "/etc/varnish/ext/wordpress_common.vcl";
+#include "/etc/varnish/ext/wordpress_common.vcl";
 
+### to remove
 # WooCommerce related; low traffic e-commerce so piping gives less issues
-include "/etc/varnish/ext/woocommerce_common.vcl";
+#include "/etc/varnish/ext/woocommerce_common.vcl";
 
+### to remove
 # Changed TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
+### to remove
 # CORS
-include "/etc/varnish/ext/addons/cors.vcl";
+#include "/etc/varnish/ext/addons/cors.vcl";
 
+### to remove
 # Secure headers
 #include "/etc/varnish/ext/addons/security.vcl";
 
+### to remove
 # Some URL manipulations
-include "/etc/varnish/ext/redirect/manipulate.vcl";
+#include "/etc/varnish/ext/redirect/manipulate.vcl";
 
+### to remove
 # Soft/hard purge
-include "/etc/varnish/ext/addons/lets_purge.vcl";
+#include "/etc/varnish/ext/addons/lets_purge.vcl";
 
+### to remove
 # Banning using Xkey
 #include "/etc/varnish/ext/addons/x-keys.vcl";
 
+### to remove
 # 301 Redirect
 #include "/etc/varnish/ext/redirect/301sites.vcl";
 
+### to remove
 # Global redirecting if any
 #include "/etc/varnish/ext/redirect/404.vcl";
 
+### to remove
 # 410 Gone
 #include "/etc/varnish/ext/redirect/410sites.vcl";
 
+### needed?
 # Banning by ASN (uses geoip-VMOD)
-include "/etc/varnish/ext/filtering/asn.vcl";
+#include "/etc/varnish/ext/filtering/asn.vcl";
 
+### to remove
 # Probes and similar good stuff
-include "/etc/varnish/ext/filtering/probes.vcl";
+#include "/etc/varnish/ext/filtering/probes.vcl";
 
+### needed?
 # Bad Bad Robots
 #include "/etc/varnish/ext/filtering/bad-bot.vcl";
 
+### to remove
 # Cute and nice botties
-include "/etc/varnish/ext/filtering/nice-bot.vcl";
+#include "/etc/varnish/ext/filtering/nice-bot.vcl";
 
+### to remove
 # User-agents of possible real users
-include "/etc/varnish/ext/filtering/user-ua.vcl";
+#include "/etc/varnish/ext/filtering/user-ua.vcl";
 
+### to remove
 # Stop knocking
 #include "/etc/varnish/ext/filtering/403.vcl";
 
+### to remove
 # Just some debugging headers like HIT and MISS
-include "/etc/varnish/ext/general/debugs.vcl";
+#include "/etc/varnish/ext/general/debugs.vcl";
 
+### to remove
 # Cheshire cat at headers
-include "/etc/varnish/ext/general/cheshire_cat.vcl";
+#include "/etc/varnish/ext/general/cheshire_cat.vcl";
 
+### to remove
 # X-headers, just for fun
-include "/etc/varnish/ext/general/x-heads.vcl";
+#include "/etc/varnish/ext/general/x-heads.vcl";
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
