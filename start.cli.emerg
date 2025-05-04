@@ -1,0 +1,2 @@
+vcl.load vcl-emergency /etc/varnish/emergency.vcl
+vcl.use vcl-emergency

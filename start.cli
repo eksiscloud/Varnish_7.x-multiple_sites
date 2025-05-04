@@ -1,0 +1,3 @@
+vcl.load default-zero /etc/varnish/default.vcl
+vcl.load emergency /etc/varnish/emergency.vcl
+vcl.use default-zero
