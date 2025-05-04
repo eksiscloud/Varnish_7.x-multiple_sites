@@ -27,7 +27,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-#import accept;		# Fix Accept-Language
+import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
@@ -109,8 +109,7 @@ sub vcl_init {
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
-	## This normalizes Accept-Language header too.
-	#new lang = accept.rule("fi");
+	new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
@@ -181,44 +180,20 @@ sub vcl_recv {
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
 	
-	## Geo-blocking, because I can
+	## GeoIP, because I can
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
-	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
-	# I'll ban or stop a country only after several tries, it is not a decision made easily 
-	# (well... it is actually, and Fail2ban will do that) 
-	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
-	# like from Turkey to Finland via Senegal
-	if (req.http.X-Country-Code ~ 
-		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
-	) {
-		std.log("banned country: " + req.http.X-Country-Code);
-		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
-	}
-	
-	# Quite often russians lie origin country, but are declaring russian as language
-	if (req.http.Accept-Language ~
-                "(ru)"
-	) {
-                std.log("banned language: " + req.http.Accept-Language);
-		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
-	}
-
-	## I can block service provider too using geoip-VMOD.
+	## ASN
 	# 1st: Finding out and normalizing ASN
 	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
 	set req.http.x-asn = std.tolower(req.http.x-asn);
 	
-	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
-	# Finding out ASN from whois-data isn't so straight forwarded
-	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
-	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
-	# I need this for trash, that are coming from countries I can't ban.
-	# ext/filtering/asn.vcl
-	call asn_name;
+	## Normalizing language
+	# Everybody will get fi. Should I remove it totally?
+	set req.http.accept-language = lang.filter(req.http.accept-language);
 	
 ################################## mark for editing
 
