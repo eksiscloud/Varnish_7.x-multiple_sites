@@ -6,9 +6,10 @@
 ##
 ## Varnish 7.1.1 default.vcl for multiple virtual hosts
 ## 
-## Known issues:
-##  - easy to get false bans (googlebot, Bing...) 
+## This works as a standalone VCL for one WordPress host
 ##
+## Known issues:
+##  
 ## Lets's start caching (...and a little bit more)
  
 ########
@@ -47,6 +48,9 @@ include "/etc/varnish/ext/manipulate.vcl";
 
 # Centralized way to handle TTLs
 include "/etc/varnish/ext/cache-ttl.vcl";
+
+# CORS can be handful, so let's give own VCL
+include "/etc/varnish/ext/cors.vcl";
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
@@ -774,9 +778,10 @@ sub vcl_backend_response {
 sub vcl_deliver {
 
 	## Still protecting WooCommerce, but trying to show some extra
-	if (resp.http.host == "store.katiska.eu") {
-		return(deliver);
-	}
+	# Just a remainder, because I use this VCL as a boilerplate too. This host isn't WooCommerce
+	#if (resp.http.host == "store.katiska.eu") {
+	#	return(deliver);
+	#}
 
 	## Damn, backend is down (or the request is not allowed; almost same thing)
 	if (resp.status == 503) {
@@ -793,12 +798,6 @@ sub vcl_deliver {
 	# varnishlog -c -g request -i Req* -i Resp* -I Timestamp:Resp -x ReqAcct -x RespUnset -X "RespHeader:(x|X)-(url|host)" 
 	unset resp.http.x-url;
 	unset resp.http.x-host;
-
-	## Moodle: Revert back to original Cache-Control header before delivery to client
-	#if (resp.http.X-Orig-Cache-Control) {
-	 #	set resp.http.Cache-Control = resp.http.X-Orig-Cache-Control;
-	#	unset resp.http.X-Orig-Cache-Control;
-	#}
 
 	## Vary to browser
 	set resp.http.Vary = "Accept-Language,Accept-Encoding";
