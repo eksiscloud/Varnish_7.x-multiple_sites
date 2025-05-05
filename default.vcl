@@ -181,22 +181,28 @@ sub vcl_recv {
 
 	## Finally we are heading to sites
 	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
-		return(vcl(label-katiska));
-	} else if (req.http.host == "store.katiska.eu") {
-		return(vcl(label-katiskastore));
-	} else if (req.http.host == "selko.katiska.eu") {
-		return(vcl(label-selkokatiska));
-	} else if (req.http.host == "www.eksis.one" || req.http.host = "eksis.one") {
-                return(vcl(label-eksisone));
-        } else if (req.http.host == "jagster.eksis.one") {
-                return(vcl(label-jagster));
-        } else if (req.http.host == "dev.eksis.one") {
-                return(vcl(label-dev));
-        } else if (req.http.host == "stats.eksis.eu") {
-                return(vcl(label-stats));
-	} else {
-		return (synth(404));
-	}
+		return (vcl(katiska));
+	} 
+	if (req.http.host == "store.katiska.eu") {
+		return(vcl(store));
+	} 
+	if (req.http.host == "selko.katiska.eu") {
+		return(vcl(selkokatiska));
+	} 
+	if (req.http.host == "www.eksis.one" || req.http.host == "eksis.one") {
+                return(vcl(eksisone));
+        } 
+	if (req.http.host == "jagster.eksis.one") {
+                return(vcl(jagster));
+        } 
+	if (req.http.host == "dev.eksis.one") {
+                return(vcl(dev));
+        } 
+	if (req.http.host == "stats.eksis.eu") {
+                return(vcl(stats));
+	}	
+	return (synth(404));
+	
 
 ## End of this road
 }
