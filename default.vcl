@@ -179,6 +179,15 @@ sub vcl_recv {
 		return (synth(403, "Access Denied " + req.http.X-Real-IP));
 	} 
 
+	## Redirecting http/80 to https/443
+        ## This could, and perhaps should, do on Nginx but certbot likes this better
+        ## I assume this could be done in default.vcl too but I don't know if
+        ## X-Forwarded-Proto would come here then
+        if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
+        (req.http.Scheme && req.http.Scheme != "https")) {
+                return(synth(750));
+        }
+
 	## Finally we are heading to sites
 	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
 		return (vcl(katiska));
