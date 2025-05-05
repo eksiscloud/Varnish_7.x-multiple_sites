@@ -98,7 +98,7 @@ acl whitelist {
 	"localhost";
 	"127.0.0.1";
 	"157.180.74.208";
-	"85.76.80.163";
+	"85.76.112.42";
 }
 
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
@@ -137,7 +137,9 @@ sub vcl_init {
 
 sub vcl_recv {
 	
-	set req.backend_hint = sites;
+	if (req.http.host == "katiska.eu" || req.http.host == "www.katiska.eu") {
+		set req.backend_hint = sites;
+	}
 
 	## Normalize hostname to avoid double caching
 	# I like to keep triple-w
@@ -165,15 +167,6 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	## Redirecting http/80 to https/443
-	## This could, and perhaps should, do on Nginx but certbot likes this better
-	## I assume this could be done in default.vcl too but I don't know if
-	## X-Forwarded-Proto would come here then
-	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-	(req.http.Scheme && req.http.Scheme != "https")) {
-		return(synth(750));
-	}
-
 	# if there is PROXY in use
 	# Used with Hitch or similar dumb ones 
 	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
@@ -184,13 +177,6 @@ sub vcl_recv {
 	## It comes from dumb TSL-proxies like Hitch
 	# This is old security measurement too
 	unset req.http.Proxy;
-
-	## It will terminate badly formed requests
-	## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
-	if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
-		# In HTTP/1.1, Host is required.
-		return (synth(400));
-	}
 
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
@@ -437,17 +423,17 @@ sub vcl_recv {
 	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read the file first.
 	# The job will be done at vcl_backend_response
 	# But is this really needed nowadays?
-	if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
-		unset req.http.cookie;
-		return(hash);
-	}
+	#if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
+	#	unset req.http.cookie;
+	#	return(hash);
+	#}
 
 	## Cache all static files by Removing all Cookies for static files
 	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-	if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
-		unset req.http.cookie;
-		return(hash);
-	}
+	#if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
+	#	unset req.http.cookie;
+	#	return(hash);
+	#}
 	
 	### Only for Wordpresses
 	
@@ -459,9 +445,9 @@ sub vcl_recv {
 	
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
 	# This must be before passing wp-admin
-	if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-		return(hash);
-	}
+	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+	#	return(hash);
+	#}
 	
 	# Some devices, mainly from Apple, send urls ending /null
 	if (req.url ~ "/null$") {
@@ -653,13 +639,6 @@ sub vcl_backend_response {
 	# varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
 	std.log("backend: " + beresp.backend.name);
 
-	## Just to be sure WooCommerce doesn't be messed up
-	# This just a reminder. I use this VCL as a boilerplate. This site isn't WooCommerce.
-#	if (bereq.http.host == "store.katiska.eu") {
-#		set beresp.uncacheable = true;
-#		return(deliver);
-#	}
-
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
@@ -767,12 +746,6 @@ sub vcl_backend_response {
 #######################vcl_deliver#####################
 #
 sub vcl_deliver {
-
-	## Still protecting WooCommerce, but trying to show some extra
-	# Just a remainder, because I use this VCL as a boilerplate too. This host isn't WooCommerce
-	#if (resp.http.host == "store.katiska.eu") {
-	#	return(deliver);
-	#}
 
 	## Damn, backend is down (or the request is not allowed; almost same thing)
 	if (resp.status == 503) {
