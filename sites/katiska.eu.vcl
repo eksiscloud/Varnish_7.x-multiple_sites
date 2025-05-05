@@ -91,6 +91,7 @@ backend sites {
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
+# Heads up! ACL must be in use, if uncommented.
  
 # This can do almost everything
 acl whitelist {
@@ -99,13 +100,6 @@ acl whitelist {
 	"157.180.74.208";
 	"85.76.80.163";
 }
-
-# WP Rocket needs access for purging, if in use... I don't use anymore, it was just so big issue all the time
-#acl wprocket {
-#	"109.234.160.58";
-#	"51.83.15.135";
-#	"51.210.39.196";
-#}
 
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
@@ -154,7 +148,8 @@ sub vcl_recv {
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        return(pipe);	
+        #return(pipe);	
+
 	### The work starts here
 	###
 	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
@@ -169,7 +164,6 @@ sub vcl_recv {
 		set req.backend_hint = sites;
 		return(pipe);
 	}
-
 
 	## Redirecting http/80 to https/443
 	## This could, and perhaps should, do on Nginx but certbot likes this better
