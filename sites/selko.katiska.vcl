@@ -100,13 +100,6 @@ acl whitelist {
 	"85.76.80.163";
 }
 
-# WP Rocket needs access for purging, if in use... I don't use anymore, it was just so big issue all the time
-#acl wprocket {
-#	"109.234.160.58";
-#	"51.83.15.135";
-#	"51.210.39.196";
-#}
-
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
@@ -149,7 +142,7 @@ sub vcl_recv {
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        return(pipe);
+        #return(pipe);
 
 	### The work starts here
 	###
