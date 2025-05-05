@@ -184,7 +184,8 @@ sub vcl_recv {
 	
 	## Let's clean up Proxy.
 	## It comes from dumb TSL-proxies like Hitch
-	#unset req.http.Proxy;
+	# This is old security measurement too
+	unset req.http.Proxy;
 
 	## It will terminate badly formed requests
 	## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
@@ -437,16 +438,14 @@ sub vcl_recv {
 		return(hash);
 	}
 	
-	## Let's clean User-Agent, just to be on safe side
-	# It will come back at vcl_hash, but without separate cache
-	# I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve bots other nice ones 
-	# and 404 from real users must fix right away
-	set req.http.x-agent = req.http.User-Agent;
-	if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
-	unset req.http.User-Agent;
-
 	### Only for Wordpresses
 	
+	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
+        # Backend of Wordpress
+        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=t>
+                return(pass);
+        }
+
 	## I have strange redirection issue with all WordPresses
 	# Must be a problem with cookies/caching/nonce, but I don't understand how.
 	# It might be somekind conflict between/from plugins too.
@@ -463,7 +462,7 @@ sub vcl_recv {
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
 	# This must be before passing wp-admin
 	if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-		return (hash);
+		return(hash);
 	}
 	
 	# Some devices, mainly from Apple, send urls ending /null
@@ -471,15 +470,6 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "/null", "/");
 	}
 	
-	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
-	# Backend of Wordpress
-	if (req.url ~ "^/wp-admin/") { return(pipe); }
-
-
-	if (req.url ~ "/wp-(login|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-		return(pass);
-	}
-
 	## Don't cache logged-in user, password reseting and posts behind password
 	# Frontend of Wordpress
 	if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
@@ -491,13 +481,6 @@ sub vcl_recv {
 	if (req.url ~ "^/wp-json/") {
 		return(pass);
 	}
-
-	## Normalize the query arguments.
-	# 'If...' structure is for Wordpress, so change/add something else when needed
-	# If std.querysort is any earlier it will break things, like giving error 500 when logging out. For me anyway, but I have some other issues with logging out too.
-#	if (req.url !~ "(wp-admin|wp-login|wp-json)") {
-#		set req.url = std.querysort(req.url);
-#	}
 
 	## Don't cache wordpress related pages
 	if (req.url ~ "(signup|activate|mail|logout)") {
@@ -515,7 +498,25 @@ sub vcl_recv {
 	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|cart|my-account|wc-api|checkout|addons|loggedout|lost-password|tuote)") {
 		unset req.http.cookie;
 	}
-	
+
+	## Normalize the query arguments.
+        # 'If...' structure is for Wordpress, so change/add something else when needed
+        # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
+	# Every other VCL examples use this really early, but those are really old and 
+	# I'm not so sure if those are actually ever tested in production.
+	if (req.url !~ "(wp-admin|wp-login|wp-json)") {
+		set req.url = std.querysort(req.url);
+	}
+
+	## Let's clean User-Agent, just to be on safe side
+        # It will come back at vcl_hash, but without separate cache
+        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve >
+        # and 404 from real users must fix right away
+        set req.http.x-agent = req.http.User-Agent;
+        if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
+        unset req.http.User-Agent;
+
+# End of this one	
 } 
 
 
