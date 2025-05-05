@@ -1,2 +1,2 @@
-vcl.load vcl-emergency /etc/varnish/emergency.vcl
-vcl.use vcl-emergency
+vcl.load hot /etc/varnish/emergency.vcl
+vcl.use hot
