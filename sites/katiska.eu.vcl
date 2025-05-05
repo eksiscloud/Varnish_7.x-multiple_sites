@@ -145,19 +145,16 @@ sub vcl_recv {
 	
 	set req.backend_hint = sites;
 
-	## just for this virtual host
-	# for stop caching uncomment
-	#return(pass);
-	# for dumb TCL-proxy uncomment
-	return(pipe);
-	
-	
 	## Normalize hostname to avoid double caching
 	# I like to keep triple-w
 	set req.http.host = regsub(req.http.host,
 	"^katiska\.eu$", "www.katiska.eu");
 	
-	
+        ## just for this virtual host
+        # for stop caching uncomment
+        #return(pass);
+        # for dumb TCL-proxy uncomment
+        return(pipe);	
 	### The work starts here
 	###
 	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
