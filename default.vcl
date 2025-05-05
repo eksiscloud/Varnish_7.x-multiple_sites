@@ -180,7 +180,7 @@ sub vcl_recv {
 	} 
 
 	## Finally we are heading to sites
-	if (req.http.host == "www.katiska.eu" || req.http.host == katiska.eu) {
+	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
 		return(vcl(label-katiska));
 	} else if (req.http.host == "store.katiska.eu") {
 		return(vcl(label-katiskastore));
