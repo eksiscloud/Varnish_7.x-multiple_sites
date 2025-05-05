@@ -33,22 +33,6 @@ backend sites {
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
  
-# This can do almost everything
-acl whitelist {
-	"localhost";
-	"127.0.0.1";
-	"157.180.74.208";
-	"85.76.80.163";
-}
-
-# All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
-# These are mostly API-services that make theirs business passing the origin service.
-# Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
-# Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-acl forbidden {
-	"printfriendly.com";
-}
-
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
 # You have to define server at backend definition too.
@@ -69,10 +53,6 @@ sub vcl_recv {
 	
 	set req.backend_hint = sites;
 
-	## Normalize hostname to avoid double caching
-	# I like to keep triple-w
-	set req.http.host = regsub(req.http.host, "stats.eksis.eu");
-	
 	## just for this virtual host
         # for stop caching uncomment
         #return(pass);
@@ -88,11 +68,6 @@ sub vcl_recv {
 #
 sub vcl_pipe {
 
-	## Implementing websocket support
-	if (req.http.upgrade) {
-		set bereq.http.upgrade = req.http.upgrade;
-		set bereq.http.connection = req.http.connection;
-	}
 
 	## The end of the road
 }
@@ -123,8 +98,7 @@ sub vcl_hash {
 #
 sub vcl_hit {
 
-	}
-	
+		
 	## End of the road, Jack
 }
 
@@ -134,7 +108,6 @@ sub vcl_hit {
 sub vcl_miss {
 
 
-	}
 
 	## Last call
 }
