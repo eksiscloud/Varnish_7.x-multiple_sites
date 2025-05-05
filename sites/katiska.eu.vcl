@@ -550,31 +550,6 @@ sub vcl_hash {
 	# Because I don't have multilingual, everything goes under "fi"
 	hash_data(req.http.Accept-Language);
 
-	## Cookie monster
-	# Just examples, because I'm usinng now different solution to take care cookies
-	
-	# Gitea 
-	#if (req.http.x-host == "gitea") {
-	#	if (req.http.cookie-lang) {
-	#		if(cookie.get("lang") ~ "^(fi)$" ) {
-	#			hash_data(cookie.get("lang"));
-	#		} else {
-	#			hash_data("fi");
-	#		}
-	#	}
-	#	hash_data(req.http.cookie);
-	#}
-	
-	# Matomo 
-	#if (req.http.x-host == "matomo") {
-	#	hash_data(req.http.cookie);
-	#}
-	
-	# WordPress/WooCommerce 
-	#if (req.http.x-host == "wordpress") {
-	#	hash_data(req.http.cookie);
-	#}
-	
 	## Return of User-Agent, but without caching
 	# Now I can send User-Agent to backend for 404 logging etc.
 	# Vary must be cleaned of course
@@ -597,8 +572,29 @@ sub vcl_hash {
 sub vcl_hit {
 
 	if (req.method == "PURGE") {
-		# ext/addons/lets_purge.vcl
-		call my_purge;
+		
+		## Hard purge sets all values (TTL, grace, keep) to 0 sec (plus build-in TTL I reckon)
+#		set req.http.purged = purge.hard();
+
+#		if (req.http.purged == "0") {
+#			return(synth(404));
+#		} else {
+#			return(synth(200, req.http.purged + " items purged."));
+#		}
+	
+		## Soft purge: zero values do same as hard purge
+		set req.http.purged = purge.soft(
+			std.duration(req.http.ttl,0s),
+			std.duration(req.http.grace,120s),
+			std.duration(req.http.keep,0s)
+		);
+	
+		if (req.http.purged == "0") {
+			return (synth(404));
+		} else {
+			return (synth(200, req.http.purged + " items purged."));
+		}
+	
 	}
 	
 	## End of the road, Jack
