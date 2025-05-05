@@ -25,6 +25,7 @@ sub asn_name {
 		|| req.http.x-asn == "njix"				# laceibaserver.com, DE, US
 		|| req.http.x-asn ~ "online sas"			# IP Pool for Iliad-Entreprises Business Hosting Customers, FR
 		|| req.http.x-asn ~ "planeetta-as"			# Planeetta Internet Oy, FI
+		|| req.http.x-asn ~ "railnet"				# Railnet LLM, US
 		|| req.http.x-asn ~ "scalaxy"				# xWEBltd, actually RU using NL and identifying as GB
 		|| req.http.x-asn ~ "server-mania"			# B2 Net Solutions Inc., CA
 		|| req.http.x-asn ~ "reliablesite"			# Dedires llc, GB from PSE
