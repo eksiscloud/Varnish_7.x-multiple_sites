@@ -45,6 +45,9 @@ include "/etc/varnish/ext/nice-bot.vcl";
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
 
+# Centralized way to handle TTLs
+include "/etc/varnish/ext/cache-ttl.vcl";
+
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
 ## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
@@ -656,10 +659,11 @@ sub vcl_backend_response {
 	std.log("backend: " + beresp.backend.name);
 
 	## Just to be sure WooCommerce doesn't be messed up
-	if (bereq.http.host == "store.katiska.eu") {
-		set beresp.uncacheable = true;
-		return(deliver);
-	}
+	# This just a reminder. I use this VCL as a boilerplate. This site isn't WooCommerce.
+#	if (bereq.http.host == "store.katiska.eu") {
+#		set beresp.uncacheable = true;
+#		return(deliver);
+#	}
 
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
@@ -678,10 +682,11 @@ sub vcl_backend_response {
 	}
 	
 	## Give relative short TTL to private ones
-	if (beresp.http.cache-control ~ "private") {
-                set beresp.uncacheable = true;
-		set beresp.ttl = 7200s; # 2h
-	}
+	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
+#	if (beresp.http.cache-control ~ "private") {
+#                set beresp.uncacheable = true;
+#		set beresp.ttl = 7200s; # 2h
+#	}
 
 
 	## ESI is enabled and now in use if needed
@@ -706,45 +711,21 @@ sub vcl_backend_response {
 	set beresp.http.Vary = beresp.http.Vary + ",Accept-Encoding";
 	
 	# User-Agent was sended to backend, but removing it from Vary prevents Varnish to use it for caching
-	# This isn't needed because of earlier unset
-        #if (beresp.http.Vary ~ "User-Agent") {
-        #        set beresp.http.Vary = regsuball(beresp.http.Vary, ",? *User-Agent *", "");
-        #        set beresp.http.Vary = regsub(beresp.http.Vary, "^, *", "");
-        #        if (beresp.http.Vary == "") {
-        #                unset beresp.http.Vary;
-        #        }
-        #}
-	
-	## Not found images from different caches after I started CDN; 
-	## yes, these should redirect on server but I don't know how
-	## Shows as ordinary 404 at logs of Wordpress of course
-	## I don't use CDN any more, because I have mostly domestic audience
-	#if (beresp.status == 404 && bereq.url ~ ".jpg") {
-	#	set beresp.status = 410;
-	#}
-	
+	# Is this really needed? I removed UA and backend doesn't set it up, but uses what it gets from http.req
+        if (beresp.http.Vary ~ "User-Agent") {
+                set beresp.http.Vary = regsuball(beresp.http.Vary, ",? *User-Agent *", "");
+                set beresp.http.Vary = regsub(beresp.http.Vary, "^, *", "");
+                if (beresp.http.Vary == "") {
+                        unset beresp.http.Vary;
+                }
+        }
+		
 	## Same thing here as in vcl_miss 
 	## No clue what to put as object 
 	#if (object needs ESI processing) {
 	#	set beresp.do_esi = true;
 	#	set beresp.do_gzip = true;
 	#}
-	
-	## Stupid knockers trying different kind of executables or archives
-	## 404 notices at backend, like Wordpress, doesn't disappear because this happens after backend
-	## All of excluded urls give 404 sometimes, so this is just failsafe. 
-	## And just an ordinary 404 gave every now and then 403.
-#	if (bereq.url !~ "(wp-json|sitemap|lib/ajax)") {
-#		if (beresp.status == 404 && bereq.url ~ "/([a-z0-9_\.-]+)\.(asp|aspx|php|js|jsp|rar|zip|tar|gz)") {
-#			if (bereq.http.X-Country-Code ~ "fi" || bereq.http.x-bot ~ "(nice|tech)") {
-#				set beresp.status = 403;
-#				set beresp.ttl = 1h; # shorter TTL for more trustful ones
-#			} else {
-#				set beresp.status = 666;
-#				set beresp.ttl = 24h; # longer TTL for foreigners
-#			}
-#		}
-#	}
 	
 	## Unset cookies except for Wordpress admin and WooCommerce pages 
 	# Heads up: product is 'tuote' in Finnish, change it!
@@ -761,10 +742,10 @@ sub vcl_backend_response {
 	
 	## Do I really have to tell this again?
 	# In-build, not needed. On other hand, it sends uncacheable right away to backend.
-	#if (bereq.method == "POST") {
-	#	set beresp.uncacheable = true;
-	#	return(deliver);
-	#}
+	if (bereq.method == "POST") {
+		set beresp.uncacheable = true;
+		return(deliver);
+	}
 
 	## I set X-Trace header, prepending it to X-Trace header received from backend. 
 	# Useful for troubleshooting
@@ -781,6 +762,7 @@ sub vcl_backend_response {
 
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
+	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
 	unset beresp.http.Pragma;
 
 	## We are at the end
