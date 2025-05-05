@@ -55,18 +55,20 @@ And use something like this:
 
 ```
 ExecStart=/usr/sbin/varnishd \
-     -I /etc/varnish/start.cli \
-     -P /var/run/varnish.pid \
-     -j unix,user=vcache \
-     -F \
-     -a :8080 \
-     -T localhost:6082 \
-     -f "" \
-     -S /etc/varnish/secret \ 
-     -p vsl_mask=+Hash \
-     -s malloc,10G
+          -I /etc/varnish/start.cli \
+          -P /var/run/varnish.pid \
+          -j unix,user=vcache \
+          -F \
+          -a :8080 \
+          -T localhost:6082 \
+          -f "" \
+          -S /etc/varnish/secret \ 
+          -p vsl_mask=+Hash \
+          -s malloc,10G
 ```
 Most important parts are ```-I /etc/varnish/start.cli``` and ```-f ""```
+
+I got error "too many \..." so putting all those in one line did the job.
 
 Don't forget ```systemctl daemon-reload```
 
@@ -99,3 +101,8 @@ To fix that you need to
 
 HEADS UP: I don't think anything of that is really issue anymore. it has fixed now, I reckon.
 
+## Known limitations
+
+```varnishd -C -f /etc/varnish/default.vcl``` doesn't work.
+
+```systemctl reload varnish``` doesn't work.
