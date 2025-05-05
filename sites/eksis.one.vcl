@@ -56,19 +56,19 @@ include "/etc/varnish/ext/cors.vcl";
 ## You can check if a backend is  healthy or sick:
 ## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
 
-probe sondi {
+#probe sondi {
     #.url = "/index.html";  # or you can use just an url
 	# you must have installed libwww-perl:
-    .request =
-      "HEAD / HTTP/1.1"
-      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-      "Connection: close"
-      "User-Agent: Varnish Health Probe";
-	.timeout = 5s;
-	.interval = 4s;
-	.window = 5;
-	.threshold = 3;
-}
+#    .request =
+#      "HEAD / HTTP/1.1"
+#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+#      "Connection: close"
+#      "User-Agent: Varnish Health Probe";
+#	.timeout = 5s;
+#	.interval = 4s;
+#	.window = 5;
+#	.threshold = 3;
+#}
 
 # Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
 # Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
@@ -86,7 +86,7 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	.probe = sondi;
+	#.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
@@ -145,19 +145,17 @@ sub vcl_recv {
 	
 	set req.backend_hint = sites;
 
-	## just for this virtual host
-	# for stop caching uncomment
-	#return(pass);
-	# for dumb TCL-proxy uncomment
-	return(pipe);
-	
-	
 	## Normalize hostname to avoid double caching
 	# I like to keep triple-w
 	set req.http.host = regsub(req.http.host,
-	"^katiska\.eu$", "www.katiska.eu");
+	"^eksis.one$", "www.eksis.one");
 	
-	
+	## just for this virtual host
+        # for stop caching uncomment
+        #return(pass);
+        # for dumb TCL-proxy uncomment
+        return(pipe);
+
 	### The work starts here
 	###
 	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
