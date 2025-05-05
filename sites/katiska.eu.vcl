@@ -808,26 +808,34 @@ sub vcl_deliver {
 	
 	# Origin should send to browser
 	set resp.http.Vary = resp.http.Vary + ",Origin";
+	
+	## Just some unneeded headers showing unneeded data
 
-	## A little bit more security, but only for those who are identied themselves as visitors
-	# CSP et cetera are just too big pain in the ass, when using Adsense, so... no.
-#	if (req.http.x-bot == "visitor") {
-#		# ext/addons/security.vcl
-		#call sec_headers;
-#	} else {
-#		set resp.http.X-Content-Type-Options = "nosniff";
-#		set resp.http.Referrer-Policy = "unsafe-url";
-#	}
+	# HIT & MISS
+	if (obj.hits > 0) {
+		# I don't fancy boring hit/miss announcements
+		set resp.http.You-had-only-one-job = "Success";
+	} else {
+		set resp.http.You-had-only-one-job = "Phew";
+	}
+
+	# Show hit counts (per objecthead)
+	# Same here, something like X-total-hits is just boring
+	if (obj.hits > 0) {
+		set resp.http.Footprint-of-CO2 = (obj.hits) + " metric-tons";
+	} else {
+		set resp.http.Footprint-of-CO2 = "Greenwash in progress";
+	}
+
+	## Using ETAG (content based) by backend is more accurate than Last-Modified (time based), 
+	# but I want to get last-modified because I'm curious, even curiosity kills the cat
+	set resp.http.Modified = resp.http.Last-Modified;
+	unset resp.http.Last-Modified;
 	
-	## Just some unneeded headers showing un-needed data
-	# ext/general/debugs.vcl
-	call diagnose;
-	
-	## Moodle: Set X-AuthOK header when authentication succeeded
-	# Not in use here, but some day... so, it will be ready
-	#if (req.http.X-AuthOK) {
-	#	set resp.http.X-AuthOK = req.http.X-AuthOK;
-	#}
+	## Just to be sure who is seeing what
+	if (req.http.x-bot) {
+		set resp.http.debug = req.http.x-bot;
+	}
 	
 	## Expires and Pragma  are unneeded because cache-control overrides it
 	unset resp.http.Expires;
@@ -857,8 +865,6 @@ sub vcl_deliver {
 		set resp.http.Your-IP-City = city.lookup("city/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0"));
 		set resp.http.Your-IP-GPS = city.lookup("location/latitude", std.ip(req.http.X-Real-IP, "0.0.0.0")) + " " + city.lookup("location/longitude", std.ip(req.http.X-Real-IP, "0.0.0.0"));
 		set resp.http.Your-IP-ASN = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-		call headers_x;		# x-heads.vcl
-		call header_smiley;	# cheshire_cat.vcl
 	}
 
 	# That's it
