@@ -901,7 +901,6 @@ sub vcl_synth {
 	## Bad request error 400
 	if (resp.status == 400) {
                 set resp.status = 400;
-                #synthetic(std.fileread("/etc/varnish/error/503.html"));
                 set resp.http.Content-Type = "text/html; charset=utf-8";
                 set resp.http.Retry-After = "5";
                 synthetic( {"<!DOCTYPE html>
@@ -925,7 +924,6 @@ sub vcl_synth {
 	## forbidden error 403
 	if (resp.status == 403) {
 		set resp.status = 403;
-		#synthetic(std.fileread("/etc/varnish/error/403.html"));
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
 		synthetic( {"<!DOCTYPE html>
@@ -950,7 +948,6 @@ sub vcl_synth {
 	## Locked (ASN)
 	if (resp.status == 423) {
 		set resp.status = 423;
-		#synthetic(std.fileread("/etc/varnish/error/423.html"));
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
 		synthetic( {"<!DOCTYPE html>
@@ -975,7 +972,6 @@ sub vcl_synth {
 	## Forbidden url
 	if (resp.status == 429) {
 		set resp.status = 429;
-		#synthetic(std.fileread("/etc/varnish/error/429.html"));
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
 		synthetic( {"<!DOCTYPE html>
@@ -1000,7 +996,6 @@ sub vcl_synth {
 	## System is down
 	if (resp.status == 503) {
 		set resp.status = 503;
-		#synthetic(std.fileread("/etc/varnish/error/503.html"));
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
 		synthetic( {"<!DOCTYPE html>
@@ -1037,7 +1032,6 @@ sub vcl_synth {
 	## Custom error for banning
 	if (resp.status == 666) {
 		set resp.status = 666;
-		#synthetic(std.fileread("/etc/varnish/error/666.html"));
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
 		synthetic( {"<!DOCTYPE html>
@@ -1149,14 +1143,3 @@ sub vcl_fini {
 
   return(ok);
 }
-
-## A couple includes keeping default.vcl more readable
-# These two must be in this order, because Varnish does things in order
-# We don't need to declare these, because Varnish knows where they belong in.
-# We can't use them in the beginning either, because then Varnish would use they too early.
-
-# Vhosts, needed when multiple virtual hosts is in use
-include "all-vhost.vcl";
-
-# Cookies are now handled last in the vcl_recv
-include "all-cookies.vcl";
