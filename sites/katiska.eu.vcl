@@ -361,6 +361,19 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## I have strange redirection issue with all WordPresses
+        # Must be a problem with cookies/caching/nonce, but I don't understand how.
+        # It might be somekind conflict between/from plugins too.
+        # So, I'm taking a short road here
+        if (
+                   req.url ~ "&_wpnonce"
+                || req.url ~ "&reauth=1"
+                || req.url ~ "&redirect_to"
+                || req.url ~ "\?gf-download"
+                ) {
+                        return(pipe);
+                }
+
 	## Keeping needed cookies and deleting rest.
 	# You don't need to hash with every cookie. You can do something like this too:
 	# sub vcl_hash {
@@ -443,19 +456,6 @@ sub vcl_recv {
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
         }
-
-	## I have strange redirection issue with all WordPresses
-	# Must be a problem with cookies/caching/nonce, but I don't understand how.
-	# It might be somekind conflict between/from plugins too.
-	# So, I'm taking a short road here
-	if (
-		   req.url ~ "&_wpnonce"
-		|| req.url ~ "&reauth=1"
-		|| req.url ~ "&redirect_to"
-		|| req.url ~ "\?gf-download"
-		) {
-			return(pipe);
-		}
 	
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
 	# This must be before passing wp-admin
