@@ -56,19 +56,19 @@ include "/etc/varnish/ext/cors.vcl";
 ## You can check if a backend is  healthy or sick:
 ## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
 
-probe sondi {
+#probe sondi {
     #.url = "/index.html";  # or you can use just an url
 	# you must have installed libwww-perl:
-    .request =
-      "HEAD / HTTP/1.1"
-      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-      "Connection: close"
-      "User-Agent: Varnish Health Probe";
-	.timeout = 5s;
-	.interval = 4s;
-	.window = 5;
-	.threshold = 3;
-}
+#    .request =
+#      "HEAD / HTTP/1.1"
+#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+#      "Connection: close"
+#      "User-Agent: Varnish Health Probe";
+#	.timeout = 5s;
+#	.interval = 4s;
+#	.window = 5;
+#	.threshold = 3;
+#}
 
 # Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
 # Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
@@ -86,7 +86,7 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	.probe = sondi;
+	#.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
@@ -154,10 +154,14 @@ sub vcl_recv {
 	
 	## Normalize hostname to avoid double caching
 	# I like to keep triple-w
-	set req.http.host = regsub(req.http.host,
-	"^katiska\.eu$", "www.katiska.eu");
+	set req.http.host = regsub(req.http.host, "store.katiska.eu");
 	
-	
+	## just for this virtual host
+        # for stop caching uncomment
+        #return(pass);
+        # for dumb TCL-proxy uncomment
+        return(pipe);
+
 	### The work starts here
 	###
 	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
@@ -506,6 +510,43 @@ sub vcl_recv {
 		unset req.http.cookie;
 	}
 
+	### WooCommerce
+	## Some of these are overlapping with WordPress section, and I have a feeling that common return(pass) may be an issue.
+	## Then user jumps off the route and might miss something. Should WC stuff come before common WP?
+
+	## Quite useless VCL for me, because nowadays I hava only one Woocommerce, and I pipe it
+
+	# Fixed non AJAX cart problem
+	# Does this same thing than earlier?
+	if (req.http.Cookie ~ "woocommerce_(cart|session)|wp_woocommerce_session") {
+		return(pass);
+	}
+	
+	# Pass the Woocommerce related
+	# 'tuote¨is product on finnish
+	# If I have 'logout' among others logging out doesn't work and gives error 500.
+	# I'm using plugin Peter's Login Redirect - conflict? Have to check it.
+	if (req.url ~ "(cart|my-account|checkout|tuote|wc-api|addons|lost-password)") {
+		return(pass);
+	}
+
+	# But if I pipe logput, it works. Matter of nonce?
+	if (req.url ~ "logout") {
+		return (pipe);
+	}
+
+	# Pass through the WooCommerce's add to cart 
+	if (req.url ~ "\?add-to-cart") {
+		return(pass);
+	}
+	
+	 #Pass the most biggest reason why the shop is so god damn slow
+	if (req.url ~ "\?wc-ajax=get_refreshed_fragments") {
+		return(pass);
+	}
+
+	## End of WooCommerce related rules
+
 	## Normalize the query arguments.
         # 'If...' structure is for Wordpress, so change/add something else when needed
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
@@ -663,7 +704,6 @@ sub vcl_backend_response {
 	std.log("backend: " + beresp.backend.name);
 
 	## Just to be sure WooCommerce doesn't be messed up
-	# This just a reminder. I use this VCL as a boilerplate. This site isn't WooCommerce.
 #	if (bereq.http.host == "store.katiska.eu") {
 #		set beresp.uncacheable = true;
 #		return(deliver);
@@ -778,7 +818,6 @@ sub vcl_backend_response {
 sub vcl_deliver {
 
 	## Still protecting WooCommerce, but trying to show some extra
-	# Just a remainder, because I use this VCL as a boilerplate too. This host isn't WooCommerce
 	#if (resp.http.host == "store.katiska.eu") {
 	#	return(deliver);
 	#}
