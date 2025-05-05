@@ -188,6 +188,13 @@ sub vcl_recv {
                 return(synth(750));
         }
 
+	## It will terminate badly formed requests
+        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+                # In HTTP/1.1, Host is required.
+                return (synth(400));
+        }
+
 	## Finally we are heading to sites
 	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
 		return (vcl(katiska));
