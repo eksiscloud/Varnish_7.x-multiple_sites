@@ -104,9 +104,9 @@ acl whitelist {
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
 # Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-#acl forbidden {
-#	"printfriendly.com";
-#}
+acl forbidden {
+	"printfriendly.com";
+}
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -466,6 +466,12 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
+        # Backend of Wordpress
+        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+                return(pass);
+        }
+
 	## Keeping needed cookies and deleting rest.
 	# You don't need to hash with every cookie. You can do something like this too:
 	# sub vcl_hash {
@@ -541,16 +547,6 @@ sub vcl_recv {
 		return(hash);
 	}
 	
-	### Only for Wordpresses
-	
-	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
-        # Backend of Wordpress
-        if (req.url ~ "^/wp-(login|admin)") { return(pipe); }
-	
-	if (req.url ~ "/wp-(my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-                return(pass);
-        }
-
 	## I have strange redirection issue with all WordPresses
 	# Must be a problem with cookies/caching/nonce, but I don't understand how.
 	# It might be somekind conflict between/from plugins too.
