@@ -31,7 +31,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
-include "/etc/varnish/ext/cache-ttl.vcl"
+include "/etc/varnish/ext/cache-ttl.vcl";
 
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
