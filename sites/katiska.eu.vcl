@@ -490,7 +490,11 @@ sub vcl_recv {
 	# This should be more detailed, because it is leaking users of WordPress at least
 	if (req.url ~ "^/wp-json/(activitypub|friends)/") {
 		return(pass);
-	} elseif (req.url ~ "^/wp-json/") {
+	} 
+	if (req.url ~ "^/wp-json/wp/v2/users") {
+		return(synth(403));
+	}
+	if (req.url ~ "^/wp-json/") {
 		return(pass);
 	}
 
