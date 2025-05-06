@@ -142,17 +142,10 @@ sub vcl_recv {
 	# for stop caching uncomment
 	#return(pass);
 	# for dumb TCL-proxy uncomment
-	return(pipe);
+	#return(pipe);
 	
 
 	### The work starts here
-	###
-	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
-	### because those bypasses other VCLs.
-	### all-common.vcl is for cookies and similar commmon things for hosts
-	### Every domain-VCLs do the rest where return(...) is needed and part of jobs are done using subs, i.e. 'call common.vcl'
-	### Exception to rule no-return-statements is everything where the connection will be terminated for good 
-	### and anything else is not needed
 
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
@@ -160,16 +153,10 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-
-	## I must clean up some trashes
-	# I should not use return(...) statement here because it passes everything, 
-	# but I want stop trashes right away so it doesn't matter
-
-	## Just an example how to do geo-blocking by VMOD.
+	## GeoIP-banning
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	# I don't like capital letters
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
@@ -235,6 +222,14 @@ sub vcl_recv {
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
+
+
+
+	###### That's it. I don't need more for this Woocommerce
+	return(pipe);
+
+	######
+
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
