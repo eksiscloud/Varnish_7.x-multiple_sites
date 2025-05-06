@@ -380,13 +380,21 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## Auth requests shall be passed. 
+	# Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
+        # In-build rule.
+        if (req.http.Authorization || req.http.Cookie) {
+                return(pass);
+        }
+
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
         # This must be before passing wp-admin
         if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
                return(hash);
         }
 
-	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work.
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+	#  before cookie monster to work.
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
@@ -411,14 +419,20 @@ sub vcl_recv {
 
 	## Auth requests shall be passed
 	# In-build rule.
-	if (req.http.Authorization || req.http.Cookie) {
-		return(pass);
-	}
+#	if (req.http.Authorization || req.http.Cookie) {
+#		return(pass);
+#	}
 	
 	## Do not cache AJAX requests.
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
 		return(pass);
 	}
+
+	## Don't cache logged-in user, password reseting and posts behind password
+        # Frontend of Wordpress
+        if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
+                return(pass);
+        }
 	
 	## Enable smart refreshing, aka. ctrl+F5 will flush that page
 	# Remember your header Cache-Control must be set something else than no-cache
@@ -462,20 +476,14 @@ sub vcl_recv {
 
 	## Cache all static files by Removing all Cookies for static files
 	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-	#if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
-	#	unset req.http.cookie;
-	#	return(hash);
-	#}
+	if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
+		unset req.http.cookie;
+		return(hash);
+	}
 		
 	## Some devices, mainly from Apple, send urls ending /null
 	if (req.url ~ "/null$") {
 		set req.url = regsub(req.url, "/null", "/");
-	}
-	
-	## Don't cache logged-in user, password reseting and posts behind password
-	# Frontend of Wordpress
-	if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
-		return(pass);
 	}
 	
 	## I don't want to fill RAM for benefits of bots.
