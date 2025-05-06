@@ -35,19 +35,19 @@ import accept;		# Fix Accept-Language
 #include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
-include "/etc/varnish/ext/user-ua.vcl";
+#include "/etc/varnish/ext/user-ua.vcl";
 
 # Tools and libraries
-include "/etc/varnish/ext/probes.vcl";
+#include "/etc/varnish/ext/probes.vcl";
 
 # Bots with purpose
-include "/etc/varnish/ext/nice-bot.vcl";
+#include "/etc/varnish/ext/nice-bot.vcl";
 
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
 
 # Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -137,9 +137,7 @@ sub vcl_init {
 
 sub vcl_recv {
 	
-	if (req.http.host == "katiska.eu" || req.http.host == "www.katiska.eu") {
-		set req.backend_hint = sites;
-	}
+	set req.backend_hint = sites;
 
 	## Normalize hostname to avoid double caching
 	# I like to keep triple-w
@@ -153,13 +151,6 @@ sub vcl_recv {
         #return(pipe);	
 
 	### The work starts here
-	###
-	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
-	### because those bypasses other VCLs.
-	### all-common.vcl is for cookies and similar commmon things for hosts
-	### Every domain-VCLs do the rest where return(...) is needed and part of jobs are done using subs, i.e. 'call common.vcl'
-	### Exception to rule no-return-statements is everything where the connection will be terminated for good 
-	### and anything else is not needed
 
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
@@ -198,21 +189,411 @@ sub vcl_recv {
 	set req.http.accept-language = lang.filter(req.http.accept-language);
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
-        # These should be real users, but some aren't
-        # ext/filtering/user-ua.vcl
-        call real_users;
-	
-	# Technical probes, so normalize UA using probes.vcl
-	# These are useful and I want to know if backend is working etc.
-	# ext/filtering/probes.vcl
-	if (req.http.x-bot != "visitor") {
-		call tech_things;
+        
+	if (req.http.User-Agent ~ "Android") {
+		#set req.http.User-Agent = "Android";
+		set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "Android";
 	}
 
-	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
-	# ext/filtering/nice-bot.vcl
+	if (req.http.User-Agent ~ "NT 10") {
+                #set req.http.User-Agent = "Windows";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "Windows";
+        }
+
+	if (req.http.User-Agent ~ "NT 6") {
+                #set req.http.User-Agent = "Win/Bot";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "Win/Bot";
+        }
+
+	if (req.http.User-Agent ~ "X11") {
+                #set req.http.User-Agent = "Linux/Bot";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "Linux/Bot";
+        }
+
+	if (req.http.User-Agent ~ "iPhone") {
+                #set req.http.User-Agent = "iPhone";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "iPhone";
+        }
+
+	if (req.http.User-Agent ~ "iPad") {
+                #set req.http.User-Agent = "iPad";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "iPad";
+        }
+
+	if (req.http.User-Agent ~ "Macintosh") {
+                #set req.http.User-Agent = "Mac";
+                set req.http.x-bot = "visitor";
+		set req.http.x-user-agent = "Mac/iPad";
+        }
+	
+	# Technical probes, so normalizing
+	if (req.http.x-bot != "visitor") {
+		
+		## Local ones
+	if (req.http.User-Agent ~ "Matomo") {
+		set req.http.User-Agent = "Matomo";
+		set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Monit") {                
+                set req.http.User-Agent = "Monit";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+	if (req.http.User-Agent ~ "WordPress/") { 
+                set req.http.User-Agent = "WordPress";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+	if (req.http.User-Agent == "Varnish Health Probe") { 
+		set req.http.x-bot = "tech"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	# Allowed only from whitelisted IP, but no bans by Fail2ban either
+	# Works only when user agent has not been changed, so this will stop only easy ones... 
+	# guess what, the most are really easy in the meaning those script kiddies are really dumb
+        if (req.http.User-Agent ~ "curl") {
+                set req.http.User-Agent = "curl";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+        if (req.http.User-Agent ~ "wget") {
+                set req.http.User-Agent = "wget";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+        if (req.http.User-Agent ~ "libwww-perl") {
+                set req.http.User-Agent = "libwww-perl";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+        if (req.http.User-Agent ~ "lwp-request") {
+                set req.http.User-Agent = "lwp-request";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+        if (req.http.User-Agent ~ "HTTPie") {
+                set req.http.User-Agent = "HTTPie";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+        if (req.http.User-Agent ~ "ruby") {
+                set req.http.User-Agent = "ruby";
+                set req.http.x-bot = "tech";
+		set req.http.x-user-agent = req.http.User-Agent;
+        }
+
+	## Now we shall filtering techs by whitelisted IPs
+        if (req.http.x-bot == "tech") {
+                if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+                        return(synth(666, "Forbidden Bot " + req.http.X-Real-IP));
+                }
+        }
+
+	# KatiskaWarmer will warm up cache, so it has to look like a visitor
+        if (req.http.User-Agent == "KatiskaWarmer") {
+		if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
+                        set req.http.x-bot = "visitor";
+			set req.http.x-user-agent = req.http.User-Agent;
+		} else {
+			return(synth(666, "False Bot"));
+		}
+	}
+
+        ## UptimeRobot has access only to some urls; if it tries something else it is not legit one
+        if (req.http.User-Agent ~ "UptimeRobot") {
+                if (req.url ~ "^/(pong|tietosuojaseloste|latest)") {
+                        set req.http.User-Agent = "UptimeRobot";
+                        set req.http.x-bot = "tech";
+			set req.http.x-user-agent = req.http.User-Agent;
+                        return(pass);
+                } else {
+                        return(synth(666, "False Bot"));
+                }
+        }
+
+        # Apple's way
+#       if (req.http.User-Agent ~ "okhttp") {
+#               if (req.http.url !~ "apple-touch-icon.png") {
+#                       return(synth(666, "Forbidden Bot " + req.http.X-Real-P));
+#               } else {
+#                       set req.http.x-bot = "tech";
+#			set req.http.x-user-agent = req.http.User-Agent;
+#               }
+#       }
+
+	}
+
+	# These are nice bots
 	if (req.http.x-bot != "(visitor|tech)") {
-		call cute_bot_allowance;
+		
+		## Useful bots, spiders etc.
+	# I'm using x-bot somekind of ACL
+	
+	if (
+		# Google
+		   req.http.User-Agent ~ "APIs-Google"
+		|| req.http.User-Agent ~ "Mediapartners-Google"
+		|| req.http.User-Agent ~ "AdsBot-Google"
+		|| req.http.User-Agent ~ "Googlebot"
+		|| req.http.User-Agent ~ "FeedFetcher-Google"
+		|| req.http.User-Agent ~ "Google-Read-Aloud"
+		|| req.http.User-Agent ~ "DuplexWeb-Google"
+		|| req.http.User-Agent ~ "Google Favicon"
+		|| req.http.User-Agent ~ "GoogleImageProxy" #anonymizes Gmail openings and is a human
+		|| req.http.User-Agent ~ "Googlebot-Video"
+		|| req.http.User-Agent ~ "AppEngine-Google" #snapchat
+		|| req.http.User-Agent == "Chrome Privacy Preserving Prefetch Proxy"
+		|| req.http.User-Agent == "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246 Mozilla/5.0" # the actual gmail bot
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "Google";
+			set req.http.x-user-agent = req.http.User-Agent; 
+		}
+		
+	if (
+		# Microsoft
+		req.http.User-Agent ~ "Bingbot"
+		|| req.http.User-Agent ~ "bingbot"
+		|| req.http.User-Agent ~ "msnbot"
+		#|| req.http.User-Agent ~ "BingPreview"	# done elsewhere
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "Bing"; 
+			set req.http.x-user-agent = req.http.User-Agent;
+		}
+		
+	if (
+		# DuckDuckGo
+		req.http.User-Agent ~ "DuckDuckBot"
+		|| req.http.User-Agent ~ "DuckDuckGo-Favicons-Bot"
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "DuckDuckGo"; 
+			set req.http.x-user-agent = req.http.User-Agent;
+		}
+		
+	if (
+                # DuckDuckGo
+                req.http.User-Agent ~ "Mastodon"
+                ) {
+                        set req.http.x-bot = "nice";
+                        set req.http.User-Agent = "Mastodon";
+                        set req.http.x-user-agent = req.http.User-Agent;
+                }
+
+
+	if (
+		# Apple
+		req.http.User-Agent ~ "Applebot"
+		|| req.http.User-Agent ~ "AppleCoreMedia"
+		|| req.http.User-Agent ~ "atc/"				# WatchOS, Podcasts
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "Apple"; 
+			set req.http.x-user-agent = req.http.User-Agent;
+		}
+		
+	if (
+		req.http.User-Agent == "iTMS"					# iTunes
+		|| req.http.User-Agent ~ "Jakarta Commons-HttpClient"		# always together with iTMS
+		|| req.http.User-Agent ~ "(Podcastit|Podcaster|Podcasts)"	# Apple Podcast-app
+		|| req.http.User-Agent ~ "iTunes"				# Older way to get podcasts, will disappers I reckon
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "iTunes"; 
+			set req.http.x-user-agent = req.http.User-Agent;
+		}
+		
+	if (
+		# Facebook
+		req.http.User-Agent ~ "externalhit_uatext"
+		|| req.http.User-Agent ~ "facebookexternalhit"
+		|| req.http.User-Agent ~ "cortex"
+		|| req.http.User-Agent ~ "adreview"
+		) { 
+			set req.http.x-bot = "nice"; 
+			set req.http.User-Agent = "Facebook"; 
+			set req.http.x-user-agent = req.http.User-Agent;
+		}
+		
+	# podcasts
+	# Allowed:
+	# Air
+	# Amazon Music Podcast
+	# AntennaPod
+	# Breaker
+	# CastBox
+	# Overcast
+	# Spotify
+	# StitcherBot
+
+	if (req.http.User-Agent ~ "Airr/") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Airr"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}	# https://www.airr.io/
+
+	if (req.http.User-Agent == "Amazon Music Podcast") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Amazon Podcast"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "AntennaPod") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "AntennaPod"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}	# https://github.com/AntennaPod/AntennaPod
+
+	if (req.http.User-Agent ~ "Breaker") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Breaker"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "CastBox") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "CastBox"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Overcast") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Overcast"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Spotify") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Spotify"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "StitcherBot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Stitcher"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+	
+	# Others
+	if (req.http.User-Agent ~ "(ia_archiver|AlexaMediaPlayer)") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Alexa"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Blekkobot") {
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Blekko"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Discourse") {
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Discourse"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent == "Amazon Simple Notification Service Agent") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "AWS"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "^MeWeBot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "MeWe"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "TurnitinBot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "TurnitinBot"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "archive.org") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Internet Archiver"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Feedly") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Feedly"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "MetaFeedly") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "MetaFeedly"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Bloglovin") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Bloglovin"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Moodlebot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Moodle"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "TelegramBot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Telegram"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+	
+	if (req.http.User-Agent ~ "^Twitterbot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Twitter"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Pinterestbot") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Pinterest"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "WhatsApp") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "WhatsApp"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Snapchat") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Snapchat"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
+	if (req.http.User-Agent ~ "Newsify") { 
+		set req.http.x-bot = "nice"; 
+		set req.http.User-Agent = "Newsify"; 
+		set req.http.x-user-agent = req.http.User-Agent;
+	}	
+
 	}
 		
 	# If a user agent isn't identified as user or a bot, its type is unknown.
@@ -500,6 +881,9 @@ sub vcl_recv {
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
 
+	## Cache all others requests if they reach this point.
+	return(hash);
+
 # End of this one	
 } 
 
@@ -657,10 +1041,10 @@ sub vcl_backend_response {
 	
 	## Give relative short TTL to private ones
 	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-#	if (beresp.http.cache-control ~ "private") {
-#                set beresp.uncacheable = true;
-#		set beresp.ttl = 7200s; # 2h
-#	}
+	if (beresp.http.cache-control ~ "private") {
+                set beresp.uncacheable = true;
+		set beresp.ttl = 7200s; # 2h
+	}
 
 
 	## ESI is enabled and now in use if needed
@@ -670,8 +1054,201 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	## How long Varnish will keep objects is guided by ext/cache-ttl.vcl
-	call time_to_go;
+	## How long Varnish will keep objects
+	### Global defaults
+
+	## Ordinary default; how long Varnish will keep objects
+        # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
+        #
+	# Server must reboot about once in month so let's use it
+        # Backend may want something different, but we don't care
+        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
+        #
+	# This I used earlier
+	#if (beresp.http.cache-control !~ "s-maxage") {
+	#	set beresp.ttl = 30d;
+	#} else {
+		# or if you will pass TTL to other intermediate caches as CDN, otherwise they will use maxage
+	#	set beresp.http.cache-control = "s-maxage=31536000, " + beresp.http.cache-control;
+	#}
+	#
+	# This I use now
+	# I make Varnish cache time x, but I'll tell to user caching very shorter time, because they re-visit quote rarely, and
+	# I force them download fresh content
+	# This is default, and can or will be overdriven later.
+	if ( beresp.status == 200 || beresp.ttl > 0s) {
+                unset beresp.http.expires;
+		unset beresp.http.cache-control;
+
+                # Set the clients TTL on this object
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+
+                #Set how long Varnish will keep it
+                set beresp.ttl = 7d;
+
+                # I don't know why I'm doing this
+		set beresp.http.X-Varnish = bereq.xid;
+	}	
+
+	## Set hit-for-pass for two minutes if TTL is 0 and response headers
+  	## allow for validation. 
+	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
+	# if verification is allowed and use user's or intermediate cache.
+	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+		return(pass(120s));
+	}
+
+        ## Cache some responses only short period
+        # Can I do beresp.status == 302 || beresp.status == 307 ?
+        if (beresp.status == 404) {
+                unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=300";
+                set beresp.ttl = 1h;
+        }
+
+	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
+	# The idea here must be that first try doesn't go in cache, so let's do another round
+        if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+               return(retry);
+        }
+
+        if (beresp.status == 410 && beresp.http.location ~ "^https?://[^/]+/") {
+               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+               return(retry);
+        }
+
+	## 301/410 are quite static, so let's change TTL
+        if (beresp.status == 301 || beresp.status == 410) {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 1y;
+        }
+
+	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
+        # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
+
+        # .css and .js are relatively long lasting; this can be an issue after updating, though
+        if (beresp.http.Content-Type ~ "^text/(css|javascript)") {
+		# This I did earlier...
+	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+        #                unset beresp.http.Cache-Control;
+        #                unset beresp.http.set-cookie;
+        #        }
+        #        set beresp.ttl = 1y;
+		# ...but because I set up cache-control in the beginning, all I do now is cleaning cookies
+		unset beresp.http.set-cookie;
+        }
+
+        # These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|csv|doc|docx|eot|gz|otf|pdf|ppt|pptx|rtf|tar|tbz|tgz|ttf|txt|txz|xls|xlsx)") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.ttl = 12h;
+                set beresp.do_stream = true;
+        }
+
+        # Images don't change
+        if (beresp.http.Content-Type ~ "^(image)/") {
+                # again, earlier this way...
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                        unset beresp.http.set-cookie;
+                #}
+                #set beresp.ttl = 600s;
+        }
+
+	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
+        # Most of these should be in CDN, but I have some MP3s behind backend
+        # Is this really needed anymore? AFAIK Varnish should do this automatic.
+        if (beresp.http.Content-Type ~ "^(video|audio)/") {
+		# I'm cleaning unnecessary if
+                #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                #}
+                set beresp.ttl = 2h; # longer TTL just eats RAM
+		unset beresp.http.set-cookie;
+                set beresp.do_stream = true;
+        }
+
+        ### Per site
+
+	## RSS and other feeds like podcast can be cached
+        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
+	# so 24h delay is acceptable
+        if (beresp.http.Content-Type ~ "text/xml") {
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+			unset beresp.http.Cache-Control;
+		#}
+		#set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 86400s;
+        }
+
+        ## Robots.txt is really static, but let's be on safe side
+        # Against all claims bots check robots.txt almost never, so caching doesn't help much
+        if (bereq.url ~ "/robots.txt") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+        ## ads.txt and sellers.json is really static to me, but let's be on safe side
+        if (bereq.url ~ "^/(ads.txt|sellers.json)") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
+        if (bereq.url ~ "sitemap") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 1h;
+        }
+
+        ## Tags this should be same than TTL of feeds. I don't have.
+        if (bereq.url ~ "(avainsana|tag)") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 24h;
+        }
+
+        ## Search results, mostly Wordpress if I'm guessing right
+        # Normally those querys should pass but I want to cache answers shortly
+        # Caching or not doesn't matter because users don't search too often anyway
+        if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 5m;
+        }
+
+	## Let's go to site-level
+	if (bereq.http.host ~ "www.(katiska|eksis)|jagster.|dev.|store.") {
+		
+		## I have an issue with one cache-control value from WordPress when speedtesting
+		if (bereq.url ~ "/icons.ttf\?pozjks") {
+			unset beresp.http.set-cookie;
+			set beresp.http.cache-control = "max-age=31536000";
+		}
+
+		## WordPress archive page of podcasts
+		if (bereq.url ~ "/podcastit/") {
+			unset beresp.http.cache-control;
+			set beresp.http.cache-control = "max-age=43200"; # 12h for client
+			set beresp.ttl = 2d;
+		}
+		
+		## Some admin-ajax.php calls can be cached by Varnish
+		# Except... it is almost always POST or OPTIONS and those are uncacheable
+		if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+			unset beresp.http.set-cookie;
+			set beresp.ttl = 1d;
+			set beresp.grace = 1d;
+		}
+	}
+
 	
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
