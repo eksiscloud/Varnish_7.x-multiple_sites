@@ -145,45 +145,16 @@ sub vcl_recv {
         #return(pipe);
 
 	### The work starts here
-	###
-	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
-	### because those bypasses other VCLs.
-	### all-common.vcl is for cookies and similar commmon things for hosts
-	### Every domain-VCLs do the rest where return(...) is needed and part of jobs are done using subs, i.e. 'call common.vcl'
-	### Exception to rule no-return-statements is everything where the connection will be terminated for good 
-	### and anything else is not needed
-
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
 		set req.backend_hint = sites;
 		return(pipe);
 	}
 
-
-	## Redirecting http/80 to https/443
-	## This could, and perhaps should, do on Nginx but certbot likes this better
-	## I assume this could be done in default.vcl too but I don't know if
-	## X-Forwarded-Proto would come here then
-	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-	(req.http.Scheme && req.http.Scheme != "https")) {
-		return(synth(750));
-	}
-
-	# if there is PROXY in use
-	# Used with Hitch or similar dumb ones 
-	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
-	#	return(synth(750));
-	#}
-
-	## I must clean up some trashes
-	# I should not use return(...) statement here because it passes everything, 
-	# but I want stop trashes right away so it doesn't matter
-
-	## Just an example how to do geo-blocking by VMOD.
+	## GeoIP
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	# I don't like capital letters
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
@@ -234,6 +205,11 @@ sub vcl_recv {
                 # In HTTP/1.1, Host is required.
                 return (synth(400));
         }
+
+
+############ That's it. This site is so middle everything that is doesn't need caching
+	return(pipe);
+
 
 	# if there is PROXY in use
 	# Used with Hitch or similar dumb ones 
