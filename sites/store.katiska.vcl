@@ -32,7 +32,7 @@ import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
-#include "/etc/varnish/ext/asn.vcl";
+include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
@@ -100,20 +100,13 @@ acl whitelist {
 	"85.76.80.163";
 }
 
-# WP Rocket needs access for purging, if in use... I don't use anymore, it was just so big issue all the time
-#acl wprocket {
-#	"109.234.160.58";
-#	"51.83.15.135";
-#	"51.210.39.196";
-#}
-
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
 # Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-#acl forbidden {
-#	"printfriendly.com";
-#}
+acl forbidden {
+	"printfriendly.com";
+}
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -143,9 +136,7 @@ sub vcl_init {
 
 sub vcl_recv {
 
-	if (req.http.host == "store.katiska.info") {
-		set req.backend_hint = sites;
-	}
+	set req.backend_hint = sites;
 
 	## just for this virtual host
 	# for stop caching uncomment
@@ -170,14 +161,65 @@ sub vcl_recv {
 	}
 
 
-	## Redirecting http/80 to https/443
-	## This could, and perhaps should, do on Nginx but certbot likes this better
-	## I assume this could be done in default.vcl too but I don't know if
-	## X-Forwarded-Proto would come here then
-	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-	(req.http.Scheme && req.http.Scheme != "https")) {
-		return(synth(750));
+	## I must clean up some trashes
+	# I should not use return(...) statement here because it passes everything, 
+	# but I want stop trashes right away so it doesn't matter
+
+	## Just an example how to do geo-blocking by VMOD.
+	# 1st: GeoIP and normalizing country codes to lower case, 
+	# because remembering to use capital letters is just too hard
+	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	# I don't like capital letters
+	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
+	
+	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
+	# I'll ban or stop a country only after several tries, it is not a decision made easily 
+	# (well... it is actually, and Fail2ban will do that) 
+	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
+	# like from Turkey to Finland via Senegal
+	if (req.http.X-Country-Code ~ 
+		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
+	) {
+		std.log("banned country: " + req.http.X-Country-Code);
+		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
 	}
+	
+	# Quite often russians lie origin country, but are declaring russian as language
+	if (req.http.accept-language ~
+                "(ru_RU|ru-RU|ru$)"
+	) {
+                std.log("banned language: " + req.http.accept-language);
+		return(synth(403, "Unsupported language: " + req.http.accept-language));
+	}
+
+	## I can block service provider too using geoip-VMOD.
+	# 1st: Finding out and normalizing ASN
+	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	set req.http.x-asn = std.tolower(req.http.x-asn);
+	
+	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
+	# Finding out ASN from whois-data isn't so straight forwarded
+	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
+	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
+	# I need this for trash, that are coming from countries I can't ban.
+	# ext/filtering/asn.vcl
+	call asn_name;
+
+	## Redirecting http/80 to https/443
+        ## This could, and perhaps should, do on Nginx but certbot likes this better
+        ## I assume this could be done in default.vcl too but I don't know if
+        ## X-Forwarded-Proto would come here then
+        if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
+        (req.http.Scheme && req.http.Scheme != "https")) {
+                return(synth(750));
+        }
+
+	## It will terminate badly formed requests
+        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+                # In HTTP/1.1, Host is required.
+                return (synth(400));
+        }
 
 	# if there is PROXY in use
 	# Used with Hitch or similar dumb ones 
@@ -190,27 +232,9 @@ sub vcl_recv {
 	# This is old security measurement too
 	unset req.http.Proxy;
 
-	## It will terminate badly formed requests
-	## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
-	if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
-		# In HTTP/1.1, Host is required.
-		return (synth(400));
-	}
-
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
-	
-	## GeoIP, because I can
-	# 1st: GeoIP and normalizing country codes to lower case, 
-	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
-	
-	## ASN
-	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
