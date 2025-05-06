@@ -43,9 +43,6 @@ include "/etc/varnish/ext/probes.vcl";
 # Bots with purpose
 include "/etc/varnish/ext/nice-bot.vcl";
 
-# Manipulating some urls
-include "/etc/varnish/ext/manipulate.vcl";
-
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
