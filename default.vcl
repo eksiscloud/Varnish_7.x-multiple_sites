@@ -62,6 +62,9 @@ sub vcl_recv {
 	### Exception to rule no-return-statements is everything where the connection will be terminated for good 
 	### and anything else is not needed
 
+	## This vcl doesn't need any caching what so ever
+	return(pass);
+
 	## I must clean up some trashes
 	# I should not use return(...) statement here because it passes everything, 
 	# but I want stop trashes right away so it doesn't matter
@@ -243,13 +246,8 @@ sub vcl_pass {
 #
 sub vcl_hash {
 
-
-	## The end
-
-	# HEADS UP!
-	# Allowing lookup will bypass in-build rules, and then you MUST hash host, server and url.
-	# If you not, your cache will be totally mess.
-#	return(lookup);
+	## Nothing should come here, but exposing lookup bypasses in-build rules
+	return(lookup);
 }
 
 
