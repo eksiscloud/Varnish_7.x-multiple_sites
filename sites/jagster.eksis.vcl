@@ -104,9 +104,9 @@ acl whitelist {
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
 # Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-#acl forbidden {
-#	"printfriendly.com";
-#}
+acl forbidden {
+	"printfriendly.com";
+}
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
