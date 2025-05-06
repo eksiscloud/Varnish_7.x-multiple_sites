@@ -106,3 +106,8 @@ HEADS UP: I don't think anything of that is really issue anymore. it has fixed n
 ```systemctl reload varnish``` doesn't work.
 
 ```varnishadm``` doesn`t work if varnishd is down.
+
+## My opinion
+
+This is one solution when is using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl with site vcls from here (that repo has some issues per se) could be the road with smallest bumps.
+
