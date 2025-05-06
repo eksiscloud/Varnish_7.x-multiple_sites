@@ -46,9 +46,6 @@ include "/etc/varnish/ext/nice-bot.vcl";
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
 
-# Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
-
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
@@ -145,13 +142,6 @@ sub vcl_recv {
         #return(pipe);
 
 	### The work starts here
-	###
-	###  vcl_recv is main thing and there will happend only normalizing etc, where is no return(...) statements 
-	### because those bypasses other VCLs.
-	### all-common.vcl is for cookies and similar commmon things for hosts
-	### Every domain-VCLs do the rest where return(...) is needed and part of jobs are done using subs, i.e. 'call common.vcl'
-	### Exception to rule no-return-statements is everything where the connection will be terminated for good 
-	### and anything else is not needed
 
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
@@ -159,31 +149,10 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-
-	## Redirecting http/80 to https/443
-	## This could, and perhaps should, do on Nginx but certbot likes this better
-	## I assume this could be done in default.vcl too but I don't know if
-	## X-Forwarded-Proto would come here then
-	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-	(req.http.Scheme && req.http.Scheme != "https")) {
-		return(synth(750));
-	}
-
-	# if there is PROXY in use
-	# Used with Hitch or similar dumb ones 
-	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
-	#	return(synth(750));
-	#}
-
-	## I must clean up some trashes
-	# I should not use return(...) statement here because it passes everything, 
-	# but I want stop trashes right away so it doesn't matter
-
-	## Just an example how to do geo-blocking by VMOD.
+	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	# I don't like capital letters
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
@@ -199,11 +168,11 @@ sub vcl_recv {
 	}
 	
 	# Quite often russians lie origin country, but are declaring russian as language
-	if (req.http.accept-language ~
+	if (req.http.Accept-Language ~
                 "(ru_RU|ru-RU|ru$)"
 	) {
-                std.log("banned language: " + req.http.accept-language);
-		return(synth(403, "Unsupported language: " + req.http.accept-language));
+                std.log("banned language: " + req.http.Accept-Language);
+		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
 	}
 
 	## I can block service provider too using geoip-VMOD.
@@ -216,13 +185,11 @@ sub vcl_recv {
 	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
 	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
 	# I need this for trash, that are coming from countries I can't ban.
-	# ext/filtering/asn.vcl
+	# ext/asn.vcl
 	call asn_name;
 
 	## Redirecting http/80 to https/443
         ## This could, and perhaps should, do on Nginx but certbot likes this better
-        ## I assume this could be done in default.vcl too but I don't know if
-        ## X-Forwarded-Proto would come here then
         if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
         (req.http.Scheme && req.http.Scheme != "https")) {
                 return(synth(750));
@@ -252,22 +219,22 @@ sub vcl_recv {
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
-	set req.http.accept-language = lang.filter(req.http.accept-language);
+	set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
-        # ext/filtering/user-ua.vcl
+        # ext/user-ua.vcl
         call real_users;
 	
 	# Technical probes, so normalize UA using probes.vcl
 	# These are useful and I want to know if backend is working etc.
-	# ext/filtering/probes.vcl
+	# ext/probes.vcl
 	if (req.http.x-bot != "visitor") {
 		call tech_things;
 	}
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
-	# ext/filtering/nice-bot.vcl
+	# ext/nice-bot.vcl
 	if (req.http.x-bot != "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
@@ -303,10 +270,10 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "\?$", "");
 	}
 		
-	## URL changes by ext/redirect/manipulate.vcl, mostly fixed search strings
-	if (req.http.x-bot == "visitor") {
-		call new_direction;
-	}
+	## URL changes by ext/manipulate.vcl, mostly fixed search strings
+	#if (req.http.x-bot == "visitor") {
+	#	call new_direction;
+	#}
 	
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
 	## so that backend doesn’t add CORS headers.
@@ -404,6 +371,12 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## Auth requests shall be passed
+        # In-build rule. doesn't needed here.
+        if (req.http.Authorization || req.http.Cookie) {
+                return(pass);
+        }
+
 	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work (well, not exacly first...)
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
@@ -425,12 +398,6 @@ sub vcl_recv {
 	# Don' let empty cookies travel any further
 	if (req.http.cookie == "") {
 		unset req.http.cookie;
-	}
-
-	## Auth requests shall be passed
-	# In-build rule. doesn't needed here.
-	if (req.http.Authorization || req.http.Cookie) {
-		return(pass);
 	}
 	
 	## Do not cache AJAX requests.
@@ -519,20 +486,15 @@ sub vcl_recv {
 	}
 
 	## Hit everything else
-	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
-	# Again, 'tuote' is product in finnish
-	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|cart|my-account|wc-api|checkout|addons|loggedout|lost-password|tuote)") {
+	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|checkout|addons|loggedout|lost-password)") {
 		unset req.http.cookie;
 	}
 
 	## Normalize the query arguments.
-        # 'If...' structure is for Wordpress, so change/add something else when needed
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
 	# Every other VCL examples use this really early, but those are really old and 
 	# I'm not so sure if those are actually ever tested in production.
-	if (req.url !~ "(wp-admin|wp-login|wp-json)") {
-		set req.url = std.querysort(req.url);
-	}
+	set req.url = std.querysort(req.url);
 
 	## Let's clean User-Agent, just to be on safe side
         # It will come back at vcl_hash, but without separate cache
@@ -541,6 +503,9 @@ sub vcl_recv {
         set req.http.x-agent = req.http.User-Agent;
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
+
+	## Everything else goes into cache
+	return(hash);
 
 # End of this one	
 } 
@@ -681,13 +646,6 @@ sub vcl_backend_response {
 	# varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
 	std.log("backend: " + beresp.backend.name);
 
-	## Just to be sure WooCommerce doesn't be messed up
-	# This just a reminder. I use this VCL as a boilerplate. This site isn't WooCommerce.
-#	if (bereq.http.host == "store.katiska.eu") {
-#		set beresp.uncacheable = true;
-#		return(deliver);
-#	}
-
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
@@ -750,13 +708,11 @@ sub vcl_backend_response {
 	#	set beresp.do_gzip = true;
 	#}
 	
-	## Unset cookies except for Wordpress admin and WooCommerce pages 
-	# Heads up: product is 'tuote' in Finnish, change it!
+	## Unset cookies except for Wordpress admin and pages
 	# Heads up: some sites may need to set cookie!
 	if (
-		bereq.url !~ "(wp-(login|admin)|login|admin-ajax|cart|my-account|wc-api|checkout|addons|logout|resetpass|lost-password|tuote|\?wc-ajax=get_refreshed_fragments)" &&
+		bereq.url !~ "(wp-(login|admin)|login|admin-ajax|my-account|addons|logout|resetpass|lost-password)" &&
 		bereq.http.cookie !~ "(wordpress_|resetpass|wp-postpass)" &&
-		bereq.http.cookie !~ "(woocommerce_|wp_woocommerce)" &&
 		beresp.status != 302 &&
 		bereq.method == "GET"
 		) { 
@@ -779,10 +735,6 @@ sub vcl_backend_response {
 	#	set beresp.http.X-Trace = regsub(server.identity, "^([^.]+),?.*$", "\1")+"->"+regsub(beresp.backend.name, "^(.+)\((?:[0-9]{1,3}\.){3}([0-9]{1,3})\)","\1(\2)");
 	#}
 
-	## I tested shortly how to use Xkey for banning, but... I just don't get it
-        # ext/addons/x-keys.vcl
-	#call ban-tags;
-
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
 	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
@@ -795,12 +747,6 @@ sub vcl_backend_response {
 #######################vcl_deliver#####################
 #
 sub vcl_deliver {
-
-	## Still protecting WooCommerce, but trying to show some extra
-	# Just a remainder, because I use this VCL as a boilerplate too. This host isn't WooCommerce
-	#if (resp.http.host == "store.katiska.eu") {
-	#	return(deliver);
-	#}
 
 	## Damn, backend is down (or the request is not allowed; almost same thing)
 	if (resp.status == 503) {
@@ -822,7 +768,7 @@ sub vcl_deliver {
 	set resp.http.Vary = "Accept-Language,Accept-Encoding";
 
 	## Let's add the origin by cors.vcl. But I'm using * so...
-	# ext/addons/cors.vcl
+	# ext/cors.vcl
 	call cors;
 	
 	# Origin should send to browser
