@@ -850,7 +850,7 @@ sub vcl_recv {
                 return(pass);
         }
 
-	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
+	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work (well, not exacly first...)
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
