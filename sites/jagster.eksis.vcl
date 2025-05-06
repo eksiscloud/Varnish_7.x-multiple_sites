@@ -32,7 +32,7 @@ import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
-#include "/etc/varnish/ext/asn.vcl";
+include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
