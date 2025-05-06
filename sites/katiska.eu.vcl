@@ -25,7 +25,7 @@ import purge;		# Soft/hard purge by Varnish 7.x
 # from geoip package, needs separate compiling per Varnish version
 import geoip2;		# Load the GeoIP2 by MaxMind
 
-# from apt install varnish modules but it needs same Varnish version that repo is delivering
+# from apt install varnish-modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
 import accept;		# Fix Accept-Language
@@ -158,20 +158,15 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	## I must clean up some trashes
-	# I should not use return(...) statement here because it passes everything, 
-	# but I want stop trashes right away so it doesn't matter
-
-	## Just an example how to do geo-blocking by VMOD.
+	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	# I don't like capital letters
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
 	# I'll ban or stop a country only after several tries, it is not a decision made easily 
-	# (well... it is actually, and Fail2ban will do that) 
+	# (well... it is actually)
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
 	# like from Turkey to Finland via Senegal
 	if (req.http.X-Country-Code ~ 
@@ -185,8 +180,8 @@ sub vcl_recv {
 	if (req.http.accept-language ~
                 "(ru_RU|ru-RU|ru$)"
 	) {
-                std.log("banned language: " + req.http.accept-language);
-		return(synth(403, "Unsupported language: " + req.http.accept-language));
+                std.log("banned language: " + req.http.Accept-Language);
+		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
 	}
 
 	## I can block service provider too using geoip-VMOD.
@@ -199,20 +194,18 @@ sub vcl_recv {
 	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
 	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
 	# I need this for trash, that are coming from countries I can't ban.
-	# ext/filtering/asn.vcl
+	# ext/asn.vcl
 	call asn_name;
 
 	## Redirecting http/80 to https/443
-        ## This could, and perhaps should, do on Nginx but certbot likes this better
-        ## I assume this could be done in default.vcl too but I don't know if
-        ## X-Forwarded-Proto would come here then
+        # This could, and perhaps should, do in Nginx, but certbot likes this better
         if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
         (req.http.Scheme && req.http.Scheme != "https")) {
                 return(synth(750));
         }
 
 	## It will terminate badly formed requests
-        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        ## Build-in rule. But works only if there isn't return(...) that forces jump away
         if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
                 # In HTTP/1.1, Host is required.
                 return (synth(400));
@@ -225,7 +218,7 @@ sub vcl_recv {
 	#}
 	
 	## Let's clean up Proxy.
-	## It comes from dumb TSL-proxies like Hitch
+	# It comes from dumb TSL-proxies like Hitch
 	# This is old security measurement too
 	unset req.http.Proxy;
 
@@ -239,18 +232,18 @@ sub vcl_recv {
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
-        # ext/filtering/user-ua.vcl
+        # ext/user-ua.vcl
         call real_users;
 	
 	# Technical probes, so normalize UA using probes.vcl
 	# These are useful and I want to know if backend is working etc.
-	# ext/filtering/probes.vcl
+	# ext/probes.vcl
 	if (req.http.x-bot != "visitor") {
 		call tech_things;
 	}
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
-	# ext/filtering/nice-bot.vcl
+	# ext/nice-bot.vcl
 	if (req.http.x-bot != "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
@@ -286,7 +279,7 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "\?$", "");
 	}
 		
-	## URL changes by ext/redirect/manipulate.vcl, mostly fixed search strings
+	## URL changes by ext/manipulate.vcl, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
 		call new_direction;
 	}
@@ -382,29 +375,22 @@ sub vcl_recv {
 	}
 	
 	## Only GET and HEAD are cacheable methods AFAIK
-        # In-build rule, doesn't needed here
+        # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
                 return(pass);
         }
 
-	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work (well, not exacly first...)
+	## admin-ajax can be a little bit faster, sometimes, but only if GET
+        # This must be before passing wp-admin
+        if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+               return(hash);
+        }
+
+	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work.
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
         }
-
-	## I have strange redirection issue with all WordPresses
-        # Must be a problem with cookies/caching/nonce, but I don't understand how.
-        # It might be somekind conflict between/from plugins too.
-        # So, I'm taking a short road here
-        if (
-                   req.url ~ "&_wpnonce"
-                || req.url ~ "&reauth=1"
-                || req.url ~ "&redirect_to"
-                || req.url ~ "\?gf-download"
-                ) {
-                        return(pipe);
-                }
 
 	## Keeping needed cookies and deleting rest.
 	# You don't need to hash with every cookie. You can do something like this too:
@@ -424,7 +410,7 @@ sub vcl_recv {
 	}
 
 	## Auth requests shall be passed
-	# In-build rule. doesn't needed here.
+	# In-build rule.
 	if (req.http.Authorization || req.http.Cookie) {
 		return(pass);
 	}
@@ -469,10 +455,10 @@ sub vcl_recv {
 	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read the file first.
 	# The job will be done at vcl_backend_response
 	# But is this really needed nowadays?
-	#if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
-	#	unset req.http.cookie;
-	#	return(hash);
-	#}
+	if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
+		unset req.http.cookie;
+		return(hash);
+	}
 
 	## Cache all static files by Removing all Cookies for static files
 	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
@@ -480,22 +466,8 @@ sub vcl_recv {
 	#	unset req.http.cookie;
 	#	return(hash);
 	#}
-	
-	### Only for Wordpresses
-	
-	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
-        # Backend of Wordpress
-#        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-#                return(pass);
-#        }
-	
-	## admin-ajax can be a little bit faster, sometimes, but only if GET
-	# This must be before passing wp-admin
-	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-	#	return(hash);
-	#}
-	
-	# Some devices, mainly from Apple, send urls ending /null
+		
+	## Some devices, mainly from Apple, send urls ending /null
 	if (req.url ~ "/null$") {
 		set req.url = regsub(req.url, "/null", "/");
 	}
@@ -507,7 +479,7 @@ sub vcl_recv {
 	}
 	
 	## I don't want to fill RAM for benefits of bots.
-	# This could be more general too, or is this smart move at all?
+	# This should be more detailed, because it is leaking users of WordPress at least
 	if (req.url ~ "^/wp-json/") {
 		return(pass);
 	}
@@ -530,18 +502,16 @@ sub vcl_recv {
 	}
 
 	## Normalize the query arguments.
-        # 'If...' structure is for Wordpress, so change/add something else when needed
+        # Perhaps wp-admin etc should be excluded?
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
-	# Every other VCL examples use this really early, but those are really old and 
+	# Every other VCL examples use this really early, but those are really aged tips and 
 	# I'm not so sure if those are actually ever tested in production.
-	if (req.url !~ "(wp-admin|wp-login|wp-json)") {
-		set req.url = std.querysort(req.url);
-	}
+	set req.url = std.querysort(req.url);
 
 	## Let's clean User-Agent, just to be on safe side
-        # It will come back at vcl_hash, but without separate cache
-        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve >
-        # and 404 from real users must fix right away
+        # It will come back at vcl_hash, but without separate caching
+        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; 
+	# I don't serve bots  and 404 from real users must fix right away
         set req.http.x-agent = req.http.User-Agent;
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
@@ -706,10 +676,10 @@ sub vcl_backend_response {
 	
 	## Give relative short TTL to private ones
 	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-#	if (beresp.http.cache-control ~ "private") {
-#                set beresp.uncacheable = true;
-#		set beresp.ttl = 7200s; # 2h
-#	}
+	if (beresp.http.cache-control ~ "private") {
+                set beresp.uncacheable = true;
+		set beresp.ttl = 7200s; # 2h
+	}
 
 
 	## ESI is enabled and now in use if needed
@@ -719,8 +689,7 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	## How long Varnish will keep objects
-	### Global defaults
+	###  How long Varnish will keep objects aka. TTL -->
 
 	## Ordinary default; how long Varnish will keep objects
         # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
@@ -759,9 +728,9 @@ sub vcl_backend_response {
   	## allow for validation. 
 	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
 	# if verification is allowed and use user's or intermediate cache.
-#	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
-#		return(pass(120s));
-#	}
+	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+		return(pass(120s));
+	}
 
         ## Cache some responses only short period
         # Can I do beresp.status == 302 || beresp.status == 307 ?
@@ -773,11 +742,11 @@ sub vcl_backend_response {
 
 	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
 	# The idea here must be that first try doesn't go in cache, so let's do another round
- #       if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
- #              set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
- #              set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
- #              return(retry);
- #      }
+       if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+              set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+              set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+              return(retry);
+      }
 
         if (beresp.status == 410 && beresp.http.location ~ "^https?://[^/]+/") {
                set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
@@ -838,8 +807,6 @@ sub vcl_backend_response {
                 set beresp.do_stream = true;
         }
 
-        ### Per site
-
 	## RSS and other feeds like podcast can be cached
         # Podcast services are checking feed way too often, and I'm quite lazy to publish,
 	# so 24h delay is acceptable
@@ -888,33 +855,30 @@ sub vcl_backend_response {
                 #set beresp.http.cache-control = "max-age=120";
                 set beresp.ttl = 5m;
         }
-
-	## Let's go to site-level
-	if (bereq.http.host ~ "www.(katiska|eksis)|jagster.|dev.|store.") {
 		
-		## I have an issue with one cache-control value from WordPress when speedtesting
-		if (bereq.url ~ "/icons.ttf\?pozjks") {
-			unset beresp.http.set-cookie;
-			set beresp.http.cache-control = "max-age=31536000";
-		}
-
-		## WordPress archive page of podcasts
-		if (bereq.url ~ "/podcastit/") {
-			unset beresp.http.cache-control;
-			set beresp.http.cache-control = "max-age=43200"; # 12h for client
-			set beresp.ttl = 2d;
-		}
-		
-		## Some admin-ajax.php calls can be cached by Varnish
-		# Except... it is almost always POST or OPTIONS and those are uncacheable
-#		if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
-#			unset beresp.http.set-cookie;
-#			set beresp.ttl = 1d;
-#			set beresp.grace = 1d;
-#		}
+	## I have an issue with one cache-control value from WordPress when speedtesting
+	if (bereq.url ~ "/icons.ttf\?pozjks") {
+		unset beresp.http.set-cookie;
+		set beresp.http.cache-control = "max-age=31536000";
 	}
 
-	
+	## WordPress archive page of podcasts
+	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=43200"; # 12h for client
+		set beresp.ttl = 2d;
+	}
+		
+	## Some admin-ajax.php calls can be cached by Varnish
+	# Except... it is almost always POST or OPTIONS and those are uncacheable
+	if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+		unset beresp.http.set-cookie;
+		set beresp.ttl = 1d;
+		set beresp.grace = 1d;
+	}
+
+	##### <-- The end of setting TTLs
+
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
         unset beresp.http.Vary;
@@ -943,13 +907,11 @@ sub vcl_backend_response {
 	#	set beresp.do_gzip = true;
 	#}
 	
-	## Unset cookies except for Wordpress admin and WooCommerce pages 
-	# Heads up: product is 'tuote' in Finnish, change it!
+	## Unset cookies except for Wordpress pages 
 	# Heads up: some sites may need to set cookie!
 	if (
-		bereq.url !~ "(wp-(login|admin)|login|admin-ajax|cart|my-account|wc-api|checkout|addons|logout|resetpass|lost-password|tuote|\?wc-ajax=get_refreshed_fragments)" &&
+		bereq.url !~ "(wp-(login|admin)|login|admin-ajax|my-account|addons|logout|resetpass|lost-password)" &&
 		bereq.http.cookie !~ "(wordpress_|resetpass|wp-postpass)" &&
-		bereq.http.cookie !~ "(woocommerce_|wp_woocommerce)" &&
 		beresp.status != 302 &&
 		bereq.method == "GET"
 		) { 
@@ -972,13 +934,9 @@ sub vcl_backend_response {
 	#	set beresp.http.X-Trace = regsub(server.identity, "^([^.]+),?.*$", "\1")+"->"+regsub(beresp.backend.name, "^(.+)\((?:[0-9]{1,3}\.){3}([0-9]{1,3})\)","\1(\2)");
 	#}
 
-	## I tested shortly how to use Xkey for banning, but... I just don't get it
-        # ext/addons/x-keys.vcl
-	#call ban-tags;
-
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
-	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
+	# AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
 	unset beresp.http.Pragma;
 
 	## We are at the end
@@ -1009,7 +967,7 @@ sub vcl_deliver {
 	set resp.http.Vary = "Accept-Language,Accept-Encoding";
 
 	## Let's add the origin by cors.vcl. But I'm using * so...
-	# ext/addons/cors.vcl
+	# ext/cors.vcl
 	call cors;
 	
 	# Origin should send to browser
