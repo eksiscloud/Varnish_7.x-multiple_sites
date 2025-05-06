@@ -488,7 +488,9 @@ sub vcl_recv {
 	
 	## I don't want to fill RAM for benefits of bots.
 	# This should be more detailed, because it is leaking users of WordPress at least
-	if (req.url ~ "^/wp-json/") {
+	if (req.url ~ "^/wp-json/(activitypub|friends)/") {
+		return(pass);
+	} elseif (req.url ~ "^/wp-json/") {
 		return(pass);
 	}
 
@@ -566,7 +568,7 @@ sub vcl_hash {
 	# Vary must be cleaned of course
 	if (req.http.x-agent) {
 		set req.http.User-Agent = req.http.x-agent;
-		unset req.http.x-user-agent;
+		unset req.http.x-agent;
 	}
 
 	## The end
