@@ -32,7 +32,7 @@ import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
-#include "/etc/varnish/ext/asn.vcl";
+include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
@@ -205,81 +205,8 @@ sub vcl_recv {
 	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
 	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
 	# I need this for trash, that are coming from countries I can't ban.
-	# Heads up: ASN can and quite often will stop more than just one company
-	# Just coming from some ASN doesn't be reason to hard banning,
-	# but everyone here is knocking too often so I'll keep doors closed
-	if (
-		   req.http.x-asn ~ "alibaba"						# Alibaba (US) Technology Co., Ltd., US,CN
-		|| req.http.x-asn ~ "avast-as-cd"					# Privax LTD, GB etc.
-		|| req.http.x-asn ~ "bladeservers"					# LeaseVPS, NL, AU
-		|| req.http.x-asn == "cogent-174"					# BlackHOST Ltd., NL
-		|| req.http.x-asn ~ "contabo"						# Contabo Inc., US
-		|| req.http.x-asn ~ "corporacion dana"				# Computer Company, US but is HN
-		|| req.http.x-asn ~ "cypresstel"					# Cypress Telecom Limited, HK
-		|| req.http.x-asn ~ "digital energy technologies"	# BG
-		|| req.http.x-asn ~ "dreamscape"					# Vodien Internet Solutions Pte Ltd, HK, SG, AU
-		|| req.http.x-asn ~ "go-daddy-com-llc"				# GoDaddy.com US (GoDaddy isn't serving any useful services too often)
-		|| req.http.x-asn ~ "hvc-as"						# NOC4Hosts Inc., US
-		|| req.http.x-asn ~ "idcloudhost"					# PT. SIBER SEKURINDO TEKNOLOGI, PT Cloud Hosting Indonesia, ID
-		|| req.http.x-asn ~ "int-network"					# IP Volume inc, SC
-		|| req.http.x-asn ~ "internet-it"					# INTERNET IT COMPANY INC, SC
-		|| req.http.x-asn ~ "logineltdas"					# Karolio IT paslaugos, LT, US, GB
-		|| req.http.x-asn ~ "networksdelmanana"				# Yaroslav Kharitonova, UY via HN from RU
-		|| req.http.x-asn == "njix"							# laceibaserver.com, DE, US
-		|| req.http.x-asn ~ "online sas"					# IP Pool for Iliad-Entreprises Business Hosting Customers, FR
-		|| req.http.x-asn ~ "planeetta-as"					# Planeetta Internet Oy, FI
-		|| req.http.x-asn ~ "scalaxy"						# xWEBltd, actually RU using NL and identifying as GB
-		|| req.http.x-asn ~ "server-mania"					# B2 Net Solutions Inc., CA
-		|| req.http.x-asn ~ "reliablesite"					# Dedires llc, GB from PSE
-		|| req.http.x-asn ~ "tefincomhost"					# Packethub S.A., NordVPN, FI, PA
-		|| req.http.x-asn ~ "whg-network"					# Web Hosted Group Ltd, GB
-		|| req.http.x-asn == "wii"							# Wholesale Internet, Inc US
-		) {
-			if (req.url !~ "wp-login") {
-				std.log("stopped ASN: " + req.http.x-asn);
-				return(synth(666, "Forbidden organization: " + std.toupper(req.http.x-asn)));
-			} else {
-				std.log("banned ASN: " + req.http.x-asn);
-				return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
-			}
-		}
-		
-	## These are really bad ones and will be banned by Fail2ban
-	# It is just smart move to ban theirs IP-space totally in Fail2ban
-	if (
-		   req.http.x-asn ~ "adsafe-"						# Integral Ad Science, Inc., US
-		|| req.http.x-asn ~ "as_delis"						# Serverion BV, NL
-		|| req.http.x-asn ~ "blazingseo"					# DE but is from IL
-		|| req.http.x-asn ~ "chinanet-backbone"				# big part of China
-		|| req.http.x-asn ~ "chinatelecom"					# a lot and couple more, CN
-		|| req.http.x-asn ~ "colocrossing"					# ColoCrossing, US
-		|| req.http.x-asn ~ "cyberverse"					# Evocative, Inc./ChunkHost, US
-		|| req.http.x-asn ~ "deltahost"						# DeltaHost, NL but actually UA
-		|| req.http.x-asn ~ "dreamhost"						# New Dream Network, LLC, US
-		|| req.http.x-asn ~ "emerald-onion"					# Emerald Onion/Tor exit, US
-		|| req.http.x-asn ~ "iomart"						# IOMART HOSTING LIMITED. GB
-		|| req.http.x-asn ~ "ionos"							# 1&1 IONOS Inc., US, SE, DE
-		|| req.http.x-asn ~ "leaseweb"						# LeaseWeb Netherlands B.V., NL
-		|| req.http.x-asn ~ "m247"							# QuickPacket, LLC, US, m247.com, GB, ES, RO
-		|| req.http.x-asn ~ "nocix"							# Nocix, LLC, US
-		|| req.http.x-asn ~ "ovh"							# OVH SAS, FR
-		|| req.http.x-asn ~ "peenq"							# PEENQ, NL
-		|| req.http.x-asn ~ "ponynet"						# FranTech Solutions, US
-		|| req.http.x-asn ~ "powerline-as"					# Ngok Fung trading, HK
-		|| req.http.x-asn ~ "selectel"						# Starcrecium Limited, CY is actually RU
-		|| req.http.x-asn ~ "serverion"						# Serverion BV, NL
-		|| req.http.x-asn ~ "squitter-networks"				# ABC Consultancy etc, CINTY EU WEB SOLUTIONS, NL
-		|| req.http.x-asn ~ "velianet"						# velia.net Internetdienste GmbH, FR is actually RU
-		|| req.http.x-asn ~ "wellnet"						# xWEBltd, NL is really RU
-		) {
-			std.log("banned ASN: " + req.http.x-asn);
-			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
-		}
-		
-	## Not ASN but is here anyway: stoping some sites using ACL and reverse DNS:
-	if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
-		return (synth(403, "Access Denied " + req.http.X-Real-IP));
-	} 
+	# ext/filtering/asn.vcl
+	call asn_name;
 
 	## Redirecting http/80 to https/443
         ## This could, and perhaps should, do on Nginx but certbot likes this better
