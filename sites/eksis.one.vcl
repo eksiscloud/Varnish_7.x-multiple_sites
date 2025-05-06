@@ -674,10 +674,10 @@ sub vcl_backend_response {
 	
 	## Give relative short TTL to private ones
 	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-	if (beresp.http.cache-control ~ "private") {
-                set beresp.uncacheable = true;
-		set beresp.ttl = 7200s; # 2h
-	}
+	#if (beresp.http.cache-control ~ "private") {
+        #        set beresp.uncacheable = true;
+	#	set beresp.ttl = 7200s; # 2h
+	#}
 
 
 	## ESI is enabled and now in use if needed
