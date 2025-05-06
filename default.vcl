@@ -17,7 +17,7 @@
 vcl 4.1;
 
 # in-build vmod
-#import std;
+import std;
 
 # from geoip package, needs separate compiling per Varnish version
 #import geoip2;		# Load the GeoIP2 by MaxMind
