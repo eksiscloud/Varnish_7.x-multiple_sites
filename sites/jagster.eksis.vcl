@@ -546,7 +546,7 @@ sub vcl_hash {
 	# Vary must be cleaned of course
 	if (req.http.x-agent) {
 		set req.http.User-Agent = req.http.x-agent;
-		unset req.http.x-user-agent;
+		unset req.http.x-agent;
 	}
 
 	## The end
