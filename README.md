@@ -4,13 +4,11 @@ My dev-copy of stack Nginx+Varnish+Apache2 with several virtual hosts, bad-bot, 
 
 This setup uses separate VCLs per site. One default.vcl rules them all and with help of Varnish labelling everything else is divided to separate "site VCLs". Yes, it means you have to edit every single VCL when making a general change. Sub-VCLs are an alternative, but because of every return(...) bypasses in-build VCL, I had always some troubles.
 
-**This NOT a working solution** 
-
 Always be really carefully when you do copy&paste from anywhere.
 
 ## Known major issues at the moment
 
-**4.5.2025**: init phase, so it doesn't work. At all.
+n/a
 
 ## The stack
 
@@ -47,7 +45,7 @@ NOTE: if you are using Docker, it bypasses UFW and needs its own rules in iptabl
 
 ## start.cli
 
-Because every main-vcl must be loaded and after that they have to be named as alias, it should do using CLI. The file start.cli will do the job, but it has to be told to Vsrnish
+Because every site-vcl must be loaded and labeled by varnishadm, it should be done using CLI. The file start.cli will do the job, but it has to be told to Vsrnish
 
 ```systemctl edit --full varnish```
 
@@ -106,3 +104,5 @@ HEADS UP: I don't think anything of that is really issue anymore. it has fixed n
 ```varnishd -C -f /etc/varnish/default.vcl``` doesn't work.
 
 ```systemctl reload varnish``` doesn't work.
+
+```varnishadm``` doesn`t work if varnishd is down.
