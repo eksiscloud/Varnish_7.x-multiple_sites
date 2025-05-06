@@ -84,6 +84,7 @@ sub cute_bot_allowance {
 		|| req.http.User-Agent ~ "facebookexternalhit"
 		|| req.http.User-Agent ~ "cortex"
 		|| req.http.User-Agent ~ "adreview"
+		|| req.http.User-Agent ~ "meta-externalagent";
 		) { 
 			set req.http.x-bot = "nice"; 
 			set req.http.User-Agent = "Facebook"; 
