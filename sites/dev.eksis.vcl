@@ -166,6 +166,145 @@ sub vcl_recv {
 	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
 	#	return(synth(750));
 	#}
+
+	## I must clean up some trashes
+	# I should not use return(...) statement here because it passes everything, 
+	# but I want stop trashes right away so it doesn't matter
+
+	## Just an example how to do geo-blocking by VMOD.
+	# 1st: GeoIP and normalizing country codes to lower case, 
+	# because remembering to use capital letters is just too hard
+	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	# I don't like capital letters
+	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
+	
+	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
+	# I'll ban or stop a country only after several tries, it is not a decision made easily 
+	# (well... it is actually, and Fail2ban will do that) 
+	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
+	# like from Turkey to Finland via Senegal
+	if (req.http.X-Country-Code ~ 
+		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
+	) {
+		std.log("banned country: " + req.http.X-Country-Code);
+		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
+	}
+	
+	# Quite often russians lie origin country, but are declaring russian as language
+	if (req.http.accept-language ~
+                "(ru_RU|ru-RU|ru$)"
+	) {
+                std.log("banned language: " + req.http.accept-language);
+		return(synth(403, "Unsupported language: " + req.http.accept-language));
+	}
+
+	## I can block service provider too using geoip-VMOD.
+	# 1st: Finding out and normalizing ASN
+	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	set req.http.x-asn = std.tolower(req.http.x-asn);
+	
+	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
+	# Finding out ASN from whois-data isn't so straight forwarded
+	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
+	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
+	# I need this for trash, that are coming from countries I can't ban.
+	# Heads up: ASN can and quite often will stop more than just one company
+	# Just coming from some ASN doesn't be reason to hard banning,
+	# but everyone here is knocking too often so I'll keep doors closed
+	if (
+		   req.http.x-asn ~ "alibaba"						# Alibaba (US) Technology Co., Ltd., US,CN
+		|| req.http.x-asn ~ "avast-as-cd"					# Privax LTD, GB etc.
+		|| req.http.x-asn ~ "bladeservers"					# LeaseVPS, NL, AU
+		|| req.http.x-asn == "cogent-174"					# BlackHOST Ltd., NL
+		|| req.http.x-asn ~ "contabo"						# Contabo Inc., US
+		|| req.http.x-asn ~ "corporacion dana"				# Computer Company, US but is HN
+		|| req.http.x-asn ~ "cypresstel"					# Cypress Telecom Limited, HK
+		|| req.http.x-asn ~ "digital energy technologies"	# BG
+		|| req.http.x-asn ~ "dreamscape"					# Vodien Internet Solutions Pte Ltd, HK, SG, AU
+		|| req.http.x-asn ~ "go-daddy-com-llc"				# GoDaddy.com US (GoDaddy isn't serving any useful services too often)
+		|| req.http.x-asn ~ "hvc-as"						# NOC4Hosts Inc., US
+		|| req.http.x-asn ~ "idcloudhost"					# PT. SIBER SEKURINDO TEKNOLOGI, PT Cloud Hosting Indonesia, ID
+		|| req.http.x-asn ~ "int-network"					# IP Volume inc, SC
+		|| req.http.x-asn ~ "internet-it"					# INTERNET IT COMPANY INC, SC
+		|| req.http.x-asn ~ "logineltdas"					# Karolio IT paslaugos, LT, US, GB
+		|| req.http.x-asn ~ "networksdelmanana"				# Yaroslav Kharitonova, UY via HN from RU
+		|| req.http.x-asn == "njix"							# laceibaserver.com, DE, US
+		|| req.http.x-asn ~ "online sas"					# IP Pool for Iliad-Entreprises Business Hosting Customers, FR
+		|| req.http.x-asn ~ "planeetta-as"					# Planeetta Internet Oy, FI
+		|| req.http.x-asn ~ "scalaxy"						# xWEBltd, actually RU using NL and identifying as GB
+		|| req.http.x-asn ~ "server-mania"					# B2 Net Solutions Inc., CA
+		|| req.http.x-asn ~ "reliablesite"					# Dedires llc, GB from PSE
+		|| req.http.x-asn ~ "tefincomhost"					# Packethub S.A., NordVPN, FI, PA
+		|| req.http.x-asn ~ "whg-network"					# Web Hosted Group Ltd, GB
+		|| req.http.x-asn == "wii"							# Wholesale Internet, Inc US
+		) {
+			if (req.url !~ "wp-login") {
+				std.log("stopped ASN: " + req.http.x-asn);
+				return(synth(666, "Forbidden organization: " + std.toupper(req.http.x-asn)));
+			} else {
+				std.log("banned ASN: " + req.http.x-asn);
+				return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
+			}
+		}
+		
+	## These are really bad ones and will be banned by Fail2ban
+	# It is just smart move to ban theirs IP-space totally in Fail2ban
+	if (
+		   req.http.x-asn ~ "adsafe-"						# Integral Ad Science, Inc., US
+		|| req.http.x-asn ~ "as_delis"						# Serverion BV, NL
+		|| req.http.x-asn ~ "blazingseo"					# DE but is from IL
+		|| req.http.x-asn ~ "chinanet-backbone"				# big part of China
+		|| req.http.x-asn ~ "chinatelecom"					# a lot and couple more, CN
+		|| req.http.x-asn ~ "colocrossing"					# ColoCrossing, US
+		|| req.http.x-asn ~ "cyberverse"					# Evocative, Inc./ChunkHost, US
+		|| req.http.x-asn ~ "deltahost"						# DeltaHost, NL but actually UA
+		|| req.http.x-asn ~ "dreamhost"						# New Dream Network, LLC, US
+		|| req.http.x-asn ~ "emerald-onion"					# Emerald Onion/Tor exit, US
+		|| req.http.x-asn ~ "iomart"						# IOMART HOSTING LIMITED. GB
+		|| req.http.x-asn ~ "ionos"							# 1&1 IONOS Inc., US, SE, DE
+		|| req.http.x-asn ~ "leaseweb"						# LeaseWeb Netherlands B.V., NL
+		|| req.http.x-asn ~ "m247"							# QuickPacket, LLC, US, m247.com, GB, ES, RO
+		|| req.http.x-asn ~ "nocix"							# Nocix, LLC, US
+		|| req.http.x-asn ~ "ovh"							# OVH SAS, FR
+		|| req.http.x-asn ~ "peenq"							# PEENQ, NL
+		|| req.http.x-asn ~ "ponynet"						# FranTech Solutions, US
+		|| req.http.x-asn ~ "powerline-as"					# Ngok Fung trading, HK
+		|| req.http.x-asn ~ "selectel"						# Starcrecium Limited, CY is actually RU
+		|| req.http.x-asn ~ "serverion"						# Serverion BV, NL
+		|| req.http.x-asn ~ "squitter-networks"				# ABC Consultancy etc, CINTY EU WEB SOLUTIONS, NL
+		|| req.http.x-asn ~ "velianet"						# velia.net Internetdienste GmbH, FR is actually RU
+		|| req.http.x-asn ~ "wellnet"						# xWEBltd, NL is really RU
+		) {
+			std.log("banned ASN: " + req.http.x-asn);
+			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
+		}
+		
+	## Not ASN but is here anyway: stoping some sites using ACL and reverse DNS:
+	if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+		return (synth(403, "Access Denied " + req.http.X-Real-IP));
+	} 
+
+	## Redirecting http/80 to https/443
+        ## This could, and perhaps should, do on Nginx but certbot likes this better
+        ## I assume this could be done in default.vcl too but I don't know if
+        ## X-Forwarded-Proto would come here then
+        if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
+        (req.http.Scheme && req.http.Scheme != "https")) {
+                return(synth(750));
+        }
+
+	## It will terminate badly formed requests
+        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+                # In HTTP/1.1, Host is required.
+                return (synth(400));
+        }
+
+	# if there is PROXY in use
+	# Used with Hitch or similar dumb ones 
+	#elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
+	#	return(synth(750));
+	#}
 	
 	## Let's clean up Proxy.
 	## It comes from dumb TSL-proxies like Hitch
@@ -182,17 +321,6 @@ sub vcl_recv {
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
-	
-	## GeoIP, because I can
-	# 1st: GeoIP and normalizing country codes to lower case, 
-	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
-	
-	## ASN
-	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?

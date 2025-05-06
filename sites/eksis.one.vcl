@@ -47,7 +47,7 @@ include "/etc/varnish/ext/nice-bot.vcl";
 include "/etc/varnish/ext/manipulate.vcl";
 
 # Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -164,15 +164,138 @@ sub vcl_recv {
 		return(pipe);
 	}
 
+	## I must clean up some trashes
+	# I should not use return(...) statement here because it passes everything, 
+	# but I want stop trashes right away so it doesn't matter
+
+	## Just an example how to do geo-blocking by VMOD.
+	# 1st: GeoIP and normalizing country codes to lower case, 
+	# because remembering to use capital letters is just too hard
+	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	# I don't like capital letters
+	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
+	
+	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
+	# I'll ban or stop a country only after several tries, it is not a decision made easily 
+	# (well... it is actually, and Fail2ban will do that) 
+	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
+	# like from Turkey to Finland via Senegal
+	if (req.http.X-Country-Code ~ 
+		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
+	) {
+		std.log("banned country: " + req.http.X-Country-Code);
+		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
+	}
+	
+	# Quite often russians lie origin country, but are declaring russian as language
+	if (req.http.accept-language ~
+                "(ru_RU|ru-RU|ru$)"
+	) {
+                std.log("banned language: " + req.http.accept-language);
+		return(synth(403, "Unsupported language: " + req.http.accept-language));
+	}
+
+	## I can block service provider too using geoip-VMOD.
+	# 1st: Finding out and normalizing ASN
+	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	set req.http.x-asn = std.tolower(req.http.x-asn);
+	
+	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
+	# Finding out ASN from whois-data isn't so straight forwarded
+	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
+	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
+	# I need this for trash, that are coming from countries I can't ban.
+	# Heads up: ASN can and quite often will stop more than just one company
+	# Just coming from some ASN doesn't be reason to hard banning,
+	# but everyone here is knocking too often so I'll keep doors closed
+	if (
+		   req.http.x-asn ~ "alibaba"						# Alibaba (US) Technology Co., Ltd., US,CN
+		|| req.http.x-asn ~ "avast-as-cd"					# Privax LTD, GB etc.
+		|| req.http.x-asn ~ "bladeservers"					# LeaseVPS, NL, AU
+		|| req.http.x-asn == "cogent-174"					# BlackHOST Ltd., NL
+		|| req.http.x-asn ~ "contabo"						# Contabo Inc., US
+		|| req.http.x-asn ~ "corporacion dana"				# Computer Company, US but is HN
+		|| req.http.x-asn ~ "cypresstel"					# Cypress Telecom Limited, HK
+		|| req.http.x-asn ~ "digital energy technologies"	# BG
+		|| req.http.x-asn ~ "dreamscape"					# Vodien Internet Solutions Pte Ltd, HK, SG, AU
+		|| req.http.x-asn ~ "go-daddy-com-llc"				# GoDaddy.com US (GoDaddy isn't serving any useful services too often)
+		|| req.http.x-asn ~ "hvc-as"						# NOC4Hosts Inc., US
+		|| req.http.x-asn ~ "idcloudhost"					# PT. SIBER SEKURINDO TEKNOLOGI, PT Cloud Hosting Indonesia, ID
+		|| req.http.x-asn ~ "int-network"					# IP Volume inc, SC
+		|| req.http.x-asn ~ "internet-it"					# INTERNET IT COMPANY INC, SC
+		|| req.http.x-asn ~ "logineltdas"					# Karolio IT paslaugos, LT, US, GB
+		|| req.http.x-asn ~ "networksdelmanana"				# Yaroslav Kharitonova, UY via HN from RU
+		|| req.http.x-asn == "njix"							# laceibaserver.com, DE, US
+		|| req.http.x-asn ~ "online sas"					# IP Pool for Iliad-Entreprises Business Hosting Customers, FR
+		|| req.http.x-asn ~ "planeetta-as"					# Planeetta Internet Oy, FI
+		|| req.http.x-asn ~ "scalaxy"						# xWEBltd, actually RU using NL and identifying as GB
+		|| req.http.x-asn ~ "server-mania"					# B2 Net Solutions Inc., CA
+		|| req.http.x-asn ~ "reliablesite"					# Dedires llc, GB from PSE
+		|| req.http.x-asn ~ "tefincomhost"					# Packethub S.A., NordVPN, FI, PA
+		|| req.http.x-asn ~ "whg-network"					# Web Hosted Group Ltd, GB
+		|| req.http.x-asn == "wii"							# Wholesale Internet, Inc US
+		) {
+			if (req.url !~ "wp-login") {
+				std.log("stopped ASN: " + req.http.x-asn);
+				return(synth(666, "Forbidden organization: " + std.toupper(req.http.x-asn)));
+			} else {
+				std.log("banned ASN: " + req.http.x-asn);
+				return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
+			}
+		}
+		
+	## These are really bad ones and will be banned by Fail2ban
+	# It is just smart move to ban theirs IP-space totally in Fail2ban
+	if (
+		   req.http.x-asn ~ "adsafe-"						# Integral Ad Science, Inc., US
+		|| req.http.x-asn ~ "as_delis"						# Serverion BV, NL
+		|| req.http.x-asn ~ "blazingseo"					# DE but is from IL
+		|| req.http.x-asn ~ "chinanet-backbone"				# big part of China
+		|| req.http.x-asn ~ "chinatelecom"					# a lot and couple more, CN
+		|| req.http.x-asn ~ "colocrossing"					# ColoCrossing, US
+		|| req.http.x-asn ~ "cyberverse"					# Evocative, Inc./ChunkHost, US
+		|| req.http.x-asn ~ "deltahost"						# DeltaHost, NL but actually UA
+		|| req.http.x-asn ~ "dreamhost"						# New Dream Network, LLC, US
+		|| req.http.x-asn ~ "emerald-onion"					# Emerald Onion/Tor exit, US
+		|| req.http.x-asn ~ "iomart"						# IOMART HOSTING LIMITED. GB
+		|| req.http.x-asn ~ "ionos"							# 1&1 IONOS Inc., US, SE, DE
+		|| req.http.x-asn ~ "leaseweb"						# LeaseWeb Netherlands B.V., NL
+		|| req.http.x-asn ~ "m247"							# QuickPacket, LLC, US, m247.com, GB, ES, RO
+		|| req.http.x-asn ~ "nocix"							# Nocix, LLC, US
+		|| req.http.x-asn ~ "ovh"							# OVH SAS, FR
+		|| req.http.x-asn ~ "peenq"							# PEENQ, NL
+		|| req.http.x-asn ~ "ponynet"						# FranTech Solutions, US
+		|| req.http.x-asn ~ "powerline-as"					# Ngok Fung trading, HK
+		|| req.http.x-asn ~ "selectel"						# Starcrecium Limited, CY is actually RU
+		|| req.http.x-asn ~ "serverion"						# Serverion BV, NL
+		|| req.http.x-asn ~ "squitter-networks"				# ABC Consultancy etc, CINTY EU WEB SOLUTIONS, NL
+		|| req.http.x-asn ~ "velianet"						# velia.net Internetdienste GmbH, FR is actually RU
+		|| req.http.x-asn ~ "wellnet"						# xWEBltd, NL is really RU
+		) {
+			std.log("banned ASN: " + req.http.x-asn);
+			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
+		}
+		
+	## Not ASN but is here anyway: stoping some sites using ACL and reverse DNS:
+	if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+		return (synth(403, "Access Denied " + req.http.X-Real-IP));
+	} 
 
 	## Redirecting http/80 to https/443
-	## This could, and perhaps should, do on Nginx but certbot likes this better
-	## I assume this could be done in default.vcl too but I don't know if
-	## X-Forwarded-Proto would come here then
-	if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-	(req.http.Scheme && req.http.Scheme != "https")) {
-		return(synth(750));
-	}
+        ## This could, and perhaps should, do on Nginx but certbot likes this better
+        ## I assume this could be done in default.vcl too but I don't know if
+        ## X-Forwarded-Proto would come here then
+        if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
+        (req.http.Scheme && req.http.Scheme != "https")) {
+                return(synth(750));
+        }
+
+	## It will terminate badly formed requests
+        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
+                # In HTTP/1.1, Host is required.
+                return (synth(400));
+        }
 
 	# if there is PROXY in use
 	# Used with Hitch or similar dumb ones 
@@ -185,27 +308,9 @@ sub vcl_recv {
 	# This is old security measurement too
 	unset req.http.Proxy;
 
-	## It will terminate badly formed requests
-	## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
-	if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
-		# In HTTP/1.1, Host is required.
-		return (synth(400));
-	}
-
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
-	
-	## GeoIP, because I can
-	# 1st: GeoIP and normalizing country codes to lower case, 
-	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
-	
-	## ASN
-	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
@@ -440,7 +545,9 @@ sub vcl_recv {
 	
 	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
         # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+        if (req.url ~ "^/wp-(login|admin)") { return(pipe); }
+	
+	if (req.url ~ "/wp-(my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
         }
 
@@ -691,8 +798,195 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	## How long Varnish will keep objects is guided by ext/cache-ttl.vcl
-	call time_to_go;
+	### Important part: TTL
+
+	## Ordinary default; how long Varnish will keep objects
+        # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
+        #
+	# Server must reboot about once in month so let's use it
+        # Backend may want something different, but we don't care
+        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
+        #
+	# This I used earlier
+	#if (beresp.http.cache-control !~ "s-maxage") {
+	#	set beresp.ttl = 30d;
+	#} else {
+		# or if you will pass TTL to other intermediate caches as CDN, otherwise they will use maxage
+	#	set beresp.http.cache-control = "s-maxage=31536000, " + beresp.http.cache-control;
+	#}
+	#
+	# This I use now
+	# I make Varnish cache time x, but I'll tell to user caching very shorter time, because they re-visit quote rarely, and
+	# I force them download fresh content
+	# This is default, and can or will be overdriven later.
+	if ( beresp.status == 200 || beresp.ttl > 0s) {
+                unset beresp.http.expires;
+		unset beresp.http.cache-control;
+
+                # Set the clients TTL on this object
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+
+                #Set how long Varnish will keep it
+                set beresp.ttl = 7d;
+
+                # I don't know why I'm doing this
+		set beresp.http.X-Varnish = bereq.xid;
+	}	
+
+	## Set hit-for-pass for two minutes if TTL is 0 and response headers
+  	## allow for validation. 
+	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
+	# if verification is allowed and use user's or intermediate cache.
+	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+		return(pass(120s));
+	}
+
+        ## Cache some responses only short period
+        # Can I do beresp.status == 302 || beresp.status == 307 ?
+        if (beresp.status == 404) {
+                unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=300";
+                set beresp.ttl = 1h;
+        }
+
+	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
+	# The idea here must be that first try doesn't go in cache, so let's do another round
+        if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+               return(retry);
+        }
+
+        if (beresp.status == 410 && beresp.http.location ~ "^https?://[^/]+/") {
+               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+               return(retry);
+        }
+
+	## 301/410 are quite static, so let's change TTL
+        if (beresp.status == 301 || beresp.status == 410) {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 1y;
+        }
+
+	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
+        # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
+
+        # .css and .js are relatively long lasting; this can be an issue after updating, though
+        if (beresp.http.Content-Type ~ "^text/(css|javascript)") {
+		# This I did earlier...
+	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+        #                unset beresp.http.Cache-Control;
+        #                unset beresp.http.set-cookie;
+        #        }
+        #        set beresp.ttl = 1y;
+		# ...but because I set up cache-control in the beginning, all I do now is cleaning cookies
+		unset beresp.http.set-cookie;
+        }
+
+        # These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|csv|doc|docx|eot|gz|otf|pdf|ppt|pptx|rtf|tar|tbz|tgz|ttf|txt|txz|xls|xlsx)") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.ttl = 12h;
+                set beresp.do_stream = true;
+        }
+
+        # Images don't change
+        if (beresp.http.Content-Type ~ "^(image)/") {
+                # again, earlier this way...
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                        unset beresp.http.set-cookie;
+                #}
+                #set beresp.ttl = 600s;
+        }
+
+	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
+        # Most of these should be in CDN, but I have some MP3s behind backend
+        # Is this really needed anymore? AFAIK Varnish should do this automatic.
+        if (beresp.http.Content-Type ~ "^(video|audio)/") {
+		# I'm cleaning unnecessary if
+                #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                #}
+                set beresp.ttl = 2h; # longer TTL just eats RAM
+		unset beresp.http.set-cookie;
+                set beresp.do_stream = true;
+        }
+
+	## RSS and other feeds like podcast can be cached
+        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
+	# so 24h delay is acceptable
+        if (beresp.http.Content-Type ~ "text/xml") {
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+			unset beresp.http.Cache-Control;
+		#}
+		#set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 86400s;
+        }
+
+        ## Robots.txt is really static, but let's be on safe side
+        # Against all claims bots check robots.txt almost never, so caching doesn't help much
+        if (bereq.url ~ "/robots.txt") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+        ## ads.txt and sellers.json is really static to me, but let's be on safe side
+        if (bereq.url ~ "^/(ads.txt|sellers.json)") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
+        if (bereq.url ~ "sitemap") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 1h;
+        }
+
+        ## Tags this should be same than TTL of feeds. I don't have.
+        if (bereq.url ~ "(avainsana|tag)") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 24h;
+        }
+
+        ## Search results, mostly Wordpress if I'm guessing right
+        # Normally those querys should pass but I want to cache answers shortly
+        # Caching or not doesn't matter because users don't search too often anyway
+        if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 5m;
+        }
+		
+	## I have an issue with one cache-control value from WordPress when speedtesting
+	if (bereq.url ~ "/icons.ttf\?pozjks") {
+		unset beresp.http.set-cookie;
+		set beresp.http.cache-control = "max-age=31536000";
+	}
+
+	## WordPress archive page of podcasts
+	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=43200"; # 12h for client
+		set beresp.ttl = 2d;
+	}
+		
+	## Some admin-ajax.php calls can be cached by Varnish
+	# Except... it is almost always POST or OPTIONS and those are uncacheable
+#	if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+#		unset beresp.http.set-cookie;
+#		set beresp.ttl = 1d;
+#		set beresp.grace = 1d;
+#	}
+	
+	### <-- The end of TTL part
 	
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
