@@ -8,7 +8,6 @@ sub time_to_go {
         #
 	# Server must reboot about once in month so let's use it
         # Backend may want something different, but we don't care
-        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
         #
 	# This I used earlier
 	#if (beresp.http.cache-control !~ "s-maxage") {
