@@ -478,11 +478,22 @@ sub vcl_recv {
 		return(pass);
 	}
 	
-	## I don't want to fill RAM for benefits of bots.
-	# This could be more general too, or is this smart move at all?
-	if (req.url ~ "^/wp-json/") {
-		return(pass);
-	}
+	## REST API 
+        # I don't want to fill RAM for benefits of bots.
+        
+        # Mastodon/ActivityPub
+        if (req.url ~ "^/wp-json/(activitypub|friends)/") {
+                return(pass);
+        } 
+        
+        # WordPress
+        if ( !req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+                return(synth(403, "Unauthorized request"));
+        }
+	
+#	if (req.url ~ "^/wp-json/") {
+#		return(pass);
+#	}
 
 	## Don't cache wordpress related pages
 	if (req.url ~ "(signup|activate|mail|logout)") {

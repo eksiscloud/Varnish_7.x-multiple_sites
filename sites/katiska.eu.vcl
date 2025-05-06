@@ -486,17 +486,22 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "/null", "/");
 	}
 	
-	## I don't want to fill RAM for benefits of bots.
-	# This should be more detailed, because it is leaking users of WordPress at least
+	## REST API 
+	# I don't want to fill RAM for benefits of bots.
+	
+	# Mastodon/ActivityPub
 	if (req.url ~ "^/wp-json/(activitypub|friends)/") {
 		return(pass);
 	} 
-	if (req.url ~ "^/wp-json/wp/v2/users") {
-		return(synth(403));
+	
+	# WordPress
+	if ( !req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+		return(synth(403, "Unauthorized request"));
 	}
-	if (req.url ~ "^/wp-json/") {
-		return(pass);
-	}
+
+#	if (req.url ~ "^/wp-json/") {
+#		return(pass);
+#	}
 
 	## Don't cache wordpress related pages
 	if (req.url ~ "(signup|activate|mail|logout)") {
