@@ -105,9 +105,9 @@ acl whitelist {
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
 # Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-#acl forbidden {
-#	"printfriendly.com";
-#}
+acl forbidden {
+	"printfriendly.com";
+}
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -305,17 +305,6 @@ sub vcl_recv {
 	## Normalize the header, remove the port (in case you're testing this on various TCP ports)
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
-	
-	## GeoIP, because I can
-	# 1st: GeoIP and normalizing country codes to lower case, 
-	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
-	
-	## ASN
-	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
@@ -861,6 +850,12 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
+        # Backend of Wordpress
+        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=t>
+                return(pass);
+        }
+
 	## I have strange redirection issue with all WordPresses
         # Must be a problem with cookies/caching/nonce, but I don't understand how.
         # It might be somekind conflict between/from plugins too.
@@ -953,9 +948,9 @@ sub vcl_recv {
 	
 	## Fix Wordpress visual editor issues, must be the first one as url requests to work (well, not exacly first...)
         # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-                return(pass);
-        }
+#        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+#                return(pass);
+#        }
 	
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
 	# This must be before passing wp-admin
@@ -1174,10 +1169,10 @@ sub vcl_backend_response {
 	
 	## Give relative short TTL to private ones
 	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-	if (beresp.http.cache-control ~ "private") {
-                set beresp.uncacheable = true;
-		set beresp.ttl = 7200s; # 2h
-	}
+#	if (beresp.http.cache-control ~ "private") {
+#                set beresp.uncacheable = true;
+#		set beresp.ttl = 7200s; # 2h
+#	}
 
 
 	## ESI is enabled and now in use if needed
@@ -1227,9 +1222,9 @@ sub vcl_backend_response {
   	## allow for validation. 
 	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
 	# if verification is allowed and use user's or intermediate cache.
-	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
-		return(pass(120s));
-	}
+#	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+#		return(pass(120s));
+#	}
 
         ## Cache some responses only short period
         # Can I do beresp.status == 302 || beresp.status == 307 ?
@@ -1241,11 +1236,11 @@ sub vcl_backend_response {
 
 	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
 	# The idea here must be that first try doesn't go in cache, so let's do another round
-        if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
-               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
-               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
-               return(retry);
-        }
+ #       if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+ #              set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+ #              set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+ #              return(retry);
+ #      }
 
         if (beresp.status == 410 && beresp.http.location ~ "^https?://[^/]+/") {
                set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
@@ -1375,11 +1370,11 @@ sub vcl_backend_response {
 		
 		## Some admin-ajax.php calls can be cached by Varnish
 		# Except... it is almost always POST or OPTIONS and those are uncacheable
-		if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
-			unset beresp.http.set-cookie;
-			set beresp.ttl = 1d;
-			set beresp.grace = 1d;
-		}
+#		if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+#			unset beresp.http.set-cookie;
+#			set beresp.ttl = 1d;
+#			set beresp.grace = 1d;
+#		}
 	}
 
 	
