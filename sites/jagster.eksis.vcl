@@ -192,6 +192,9 @@ sub vcl_recv {
                 return(synth(750));
         }
 
+	## Reset hit/miss counter
+        unset req.http.x-cache;
+
 	## It will terminate badly formed requests
         ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
         if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
@@ -528,6 +531,9 @@ sub vcl_recv {
 #
 sub vcl_pipe {
 
+	## Pipe counter
+        set req.http.x-cache = "pipe uncacheable";
+
 	## Implementing websocket support
 	if (req.http.upgrade) {
 		set bereq.http.upgrade = req.http.upgrade;
@@ -542,6 +548,8 @@ sub vcl_pipe {
 #
 sub vcl_pass {
 
+	## Pass counter
+        set req.http.x-cache = "pass";
 
 }
 
@@ -581,6 +589,12 @@ sub vcl_hash {
 #
 sub vcl_hit {
 
+	## Hit counter, grace
+        set req.http.x-cache = "hit";
+        if (obj.ttl <= 0s && obj.grace > 0s) {
+                set req.http.x-cache = "hit graced";
+        }
+
 	if (req.method == "PURGE") {
 		
 		## Hard purge sets all values (TTL, grace, keep) to 0 sec (plus build-in TTL I reckon)
@@ -614,6 +628,9 @@ sub vcl_hit {
 ###################vcl_miss#########################
 #
 sub vcl_miss {
+
+	## Miss counter
+        set req.http.x-cache = "miss";
 
 	## ESI
 	# I don't know how to handle ESI or do I need it at all
@@ -985,6 +1002,14 @@ sub vcl_deliver {
 	## Just some unneeded headers showing unneeded data
 
 	# HIT & MISS
+	if (obj.uncacheable) {
+                set req.http.x-cache = req.http.x-cache + " miss" ;
+        } else {
+                set req.http.x-cache = req.http.x-cache + " hit" ;
+        } 
+        # uncomment the following line to show the information in the response
+        set resp.http.x-cache = req.http.x-cache;
+
 	if (obj.hits > 0) {
 		# I don't fancy boring hit/miss announcements
 		set resp.http.You-had-only-one-job = "Success";
@@ -1066,6 +1091,11 @@ sub vcl_purge {
 ##################vcl_synth######################
 #
 sub vcl_synth {
+
+	## Synth counter
+        set req.http.x-cache = "synth synth";
+        # uncomment the following line to show the information in the response
+        # set resp.http.x-cache = req.http.x-cache;
 
 	call cors;
 	
