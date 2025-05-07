@@ -14,14 +14,13 @@ n/a
 
 The stack is:
 
-Nginx listening 80 and 443, redirecting from 80 to 443
-Nging is terminating SSL and taking care of HTTP/2
-Varnish is listening port 8080
-Apache2 is listening port 8282
+* Nginx listening 80 and 443, redirecting from 80 to 443 is done by Varnish. Nging is terminating SSL and taking care of HTTP/2, plus doing some filtering
+* Varnish is listening port 8080 and doing its magic
+* Apache2 is the backend listening port 8282
 
 ## The setup of Varnish
 
-I've tried comment everything but all I've done are quite basic things and self explaining. Some doesn't work or do weird things.
+I've tried comment everything but all I've done are quite basic things and self explaining. It is not so optimized, and TTLs aren't planned, but chosen by feelings.
 
 ## Limitations
 
@@ -35,13 +34,10 @@ learn how to use varnishlog or varnishnsca to explore basic incoming requests.
 
 ## The base
 
-I'm using one VPS, hosting few WordPresses and one WooCommerce (default.vcl has commented parts for Gitea and Moodle, though)
+I'm using one VPS, hosting few WordPresses and one WooCommerce.
 * Nginx/Varnish (as a hub taking care of virtual hosts and caching; needs more RAM)
 * Apache2 as backend for "ordinary" sites (needs more disk, not so much RAM, unless you have dynamic sites like e-commerces)
 * do NOT try to put JS-heavy web-apps, as Discourse-forum, behind Varnish - unless there is need to do some exotic things, as load balancing.
-Backends are talking to front using spesified port that is limited only for those two IP-addresses.
-
-NOTE: if you are using Docker, it bypasses UFW and needs its own rules in iptables.
 
 ## start.cli
 
@@ -72,8 +68,8 @@ Don't forget `systemctl daemon-reload`
 
 ## GeoIP
 
-I'm using GeoIP on Nginx to identify countries and telling it to Varnish. Both needs extra work when installing/setup, but it is not that hard
-job - Google will help you. Mostly part of Nginx is just a relic from time when I used iptables for banning and filtering.
+I'm using GeoIP on Nginx to identify countries and Varnish uses its own vmod to do banning. Both needs extra work when installing/setup, but it is not that hard
+job - Google will help you. GeoIP part of Nginx is just a relic from time when I used iptables for banning and filtering, but niw it just gives country in its logs.
 
 ## War against bots
 
@@ -81,8 +77,7 @@ Nginx do the work and Varnish is just a backup. There is an example how to do fi
 
 ## Virtual hosts
 
-Nginx is listening both ports, 80 and 443, and sends requests to Varnish. Varnish will then redirect port 80 to port 443. 
-It would be more smarter to do on Nginx using simple rewrite, but certbot has too much issues with that.
+Nowadays all my sites behind Varnish are WordPresses, so all site-vcls are identical. There is one WooCommerce, and it does some WC-stuff, but after all it is WordPress too.
 
 ### Certbot crashes Ngnix
 `certbot renew` can't shutdown and restart Nginx right. Certbot shall shutdown Nginx first and 
@@ -97,7 +92,7 @@ To fix that you need to
 * never use crontab to renew certificates; there is system-timer for that
 * do pipe; for certbot at very early stage on default.vcl
 
-HEADS UP: I don't think anything of that is really issue anymore. it has fixed now, I reckon.
+HEADS UP: I don't think anything of that is really issue anymore. it has fixed now, I reckon. When installed using snap such issues vanished.
 
 ## Known limitations
 
@@ -111,11 +106,11 @@ Do loading new vcl and connecting to label
 
 `varnishadm vcl.load katiska-orig-$(date +%s) /etc/varnish/sites/katiska.eu.vcl && varnishadm vcl.list`
 
-`vcl.list` gives list all loaded VCLs and labels. Check what is name of time stamped one, and then
+`vcl.list` gives list of all loaded VCLs and labels. Check what is the name of time stamped one, and then
 
 `varnishadm vcl.label katiska katiska-orig-1746614848`
 
-Now is the new VCL loaded and linked to right label. Same thing than `systemctl reload varnish` but now it must be done per site. That system gives ypu fast way to roll back, if/when needed. Except if you crashed varnishd, because the `varnishadm` doesn`t work. So test your syntax before reloading/restart.
+Now is the new VCL loaded and linked to right label. Same thing than `systemctl reload varnish` but now it must be done per site. That system gives you fast way to roll back, if/when needed. Except if you crashed varnishd, because then `varnishadm` doesn`t work. So test your syntax before reloading/restart.
 
 * do you want to get rid off old loads from vcl.list? `varnishadm vcl.discard katiska-orig`
 
