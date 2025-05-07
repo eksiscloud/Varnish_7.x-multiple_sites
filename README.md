@@ -114,6 +114,29 @@ Now is the new VCL loaded and linked to right label. Same thing than `systemctl 
 
 * do you want to get rid off old loads from vcl.list? `varnishadm vcl.discard katiska-orig`
 
+## When panicking
+
+There is two way to handle situations when something goes to south.
+
+**Varnish is up** but it is doing something it should not, like caching admin-side of a backend or giving some error to users. Then it easier warm up `emergency.vcl`. All it does is giving to everyone `return(pipe)` and letting everyone directly thru.
+```
+varnishadm vcl.use emergency
+```
+Make your fixed, load them up and return back to business changing back to ordinary:
+```
+varnishadm vcl.use root
+```
+
+**Varnish** has crashed, because you didn't check if a VCL has error, or something else. We must start `varnishd` to get CLI, and easier way to do that fast is using panicbutton:
+```
+./panic.sh
+```
+* the script starts new `varnishd`
+* it uses `start.cli.emerg`
+* and that loads up and uses `emergency.vcl`
+
+Because all of that happens in CLI your `varnishd` shuts down when you close CLI session. So perhaps new console and there tmux is a smart move?
+
 ## My opinion
 
 This is one solution when using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl with site vcls from here (that repo has some issues per se) could be the road with smallest bumps.
