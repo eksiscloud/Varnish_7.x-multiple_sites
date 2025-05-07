@@ -28,7 +28,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-import accept;		# Fix Accept-Language
+#import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
@@ -118,7 +118,7 @@ sub vcl_init {
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
-	new lang = accept.rule("fi");
+	#new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
@@ -176,11 +176,11 @@ sub vcl_recv {
 	}
 	
 	# Quite often russians lie origin country, but are declaring russian as language
-	if (req.http.accept-language ~
-                "(ru_RU|ru-RU|ru$)"
+	if (req.http.Accept-Language ~
+                "(ru)"
 	) {
-                std.log("banned language: " + req.http.accept-language);
-		return(synth(403, "Unsupported language: " + req.http.accept-language));
+                std.log("banned language: " + req.http.Accept-Language);
+		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
 	}
 
 	## I can block service provider too using geoip-VMOD.
@@ -227,7 +227,7 @@ sub vcl_recv {
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
-	set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
+	#set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
@@ -408,7 +408,7 @@ sub vcl_recv {
 	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
 	# But why _pk_ cookies passes?
 	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass,woocommerce_cart_hash,woocommerce_items_in_cart,wp_woocommerce_session_");
+	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
 	set req.http.cookie = cookie.get_string();
 
 	# Don' let empty cookies travel any further
@@ -525,6 +525,11 @@ sub vcl_recv {
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
 
+	## Because vmod Accept isn't in use, we have to remove Accept-Language, because there is no need to cache with it.
+	# Let's tranfer to response anyway
+	set req.http.x-language = req.http.Accept-Language;
+	unset req.http.Accept-Language;
+	
 	## After that point everything goes into cache
 	return(hash);
 
@@ -560,14 +565,21 @@ sub vcl_hash {
 
 	## Caching per language, that's why we normalized this
 	# Because I don't have multilingual, everything goes under "fi"
-	hash_data(req.http.Accept-Language);
+	#hash_data(req.http.Accept-Language);
 
-	## Return of User-Agent, but without caching
+	## Return of User-Agent and Accept-Language, but without caching
+	
 	# Now I can send User-Agent to backend for 404 logging etc.
 	# Vary must be cleaned of course
 	if (req.http.x-agent) {
 		set req.http.User-Agent = req.http.x-agent;
-		unset req.http.x-user-agent;
+		unset req.http.x-agent;
+	}
+	
+	# Same thing with Accept-Language
+	if (req.http.x-language) {
+		set req.http.Accept-Language = req.http.x-language;
+		unset req.http.x-language;
 	}
 
 	## The end
@@ -893,11 +905,11 @@ sub vcl_backend_response {
         unset beresp.http.Vary;
         
         # I normalize Accept-Language, so it can be in vary
-	set beresp.http.Vary = "Accept-Language";
+	#set beresp.http.Vary = "Accept-Language";
         
 	# Accept-Encoding could be in Vary, because it changes content
 	# But it is handled internally by Varnish.
-	set beresp.http.Vary = beresp.http.Vary + ",Accept-Encoding";
+	set beresp.http.Vary = "Accept-Encoding";
 	
 	# User-Agent was sended to backend, but removing it from Vary prevents Varnish to use it for caching
 	# Is this really needed? I removed UA and backend doesn't set it up, but uses what it gets from http.req
@@ -947,6 +959,9 @@ sub vcl_backend_response {
         # ext/addons/x-keys.vcl
 	#call ban-tags;
 
+	## Unset Accept-Language, if backend gave one. We still want to keep it outside cache.
+	unset beresp.http.Accept-Language;
+
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
 	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
@@ -983,7 +998,7 @@ sub vcl_deliver {
 	unset resp.http.x-host;
 
 	## Vary to browser
-	set resp.http.Vary = "Accept-Language,Accept-Encoding";
+	set resp.http.Vary = "Accept-Encoding";
 
 	## Let's add the origin by cors.vcl. But I'm using * so...
 	# ext/addons/cors.vcl
