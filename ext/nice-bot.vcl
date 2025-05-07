@@ -84,7 +84,7 @@ sub cute_bot_allowance {
 		|| req.http.User-Agent ~ "facebookexternalhit"
 		|| req.http.User-Agent ~ "cortex"
 		|| req.http.User-Agent ~ "adreview"
-		|| req.http.User-Agent ~ "meta-externalagent";
+		|| req.http.User-Agent ~ "meta-externalagent"
 		) { 
 			set req.http.x-bot = "nice"; 
 			set req.http.User-Agent = "Facebook"; 
@@ -174,6 +174,12 @@ sub cute_bot_allowance {
 		set req.http.User-Agent = "AWS"; 
 		set req.http.x-user-agent = req.http.User-Agent;
 	}
+
+	if (req.http.User-Agent ~ "Amazon-Advertising-ad-standards-bot") {
+		set req.http.x-bot = "nice";
+                set req.http.User-Agent = "Amazon";
+                set req.http.x-user-agent = req.http.User-Agent;
+        }
 
 	if (req.http.User-Agent ~ "^MeWeBot") { 
 		set req.http.x-bot = "nice"; 
