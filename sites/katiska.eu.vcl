@@ -913,7 +913,7 @@ sub vcl_backend_response {
         
 	# Accept-Encoding could be in Vary, because it changes content
 	# But it is handled internally by Varnish.
-	set beresp.http.Vary = beresp.http.Vary + ",Accept-Encoding";
+	set beresp.http.Vary = "Accept-Encoding";
 	
 	# User-Agent was sended to backend, but removing it from Vary prevents Varnish to use it for caching
 	# Is this really needed? I removed UA and backend doesn't set it up, but uses what it gets from http.req
