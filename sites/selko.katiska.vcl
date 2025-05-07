@@ -1003,9 +1003,9 @@ sub vcl_deliver {
 
 	# HIT & MISS
 	if (obj.uncacheable) {
-                set req.http.x-cache = req.http.x-cache + " miss" ;
+                set req.http.x-cache = req.http.x-cache + " uncacheable" ;
         } else {
-                set req.http.x-cache = req.http.x-cache + " hit" ;
+                set req.http.x-cache = req.http.x-cache + " cached" ;
         } 
         # uncomment the following line to show the information in the response
         set resp.http.x-cache = req.http.x-cache;
