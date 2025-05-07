@@ -136,7 +136,7 @@ sub vcl_recv {
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        return(pipe);
+        #return(pipe);
 
 	### The work starts here
 
