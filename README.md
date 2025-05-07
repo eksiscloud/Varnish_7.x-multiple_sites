@@ -102,12 +102,17 @@ HEADS UP: I don't think anything of that is really issue anymore. it has fixed n
 ## Known limitations
 
 `varnishd -C -f /etc/varnish/default.vcl` doesn't work.
+* do: `varnishd -C -f /etc/varnish/sites/site.vcl`
 
 `systemctl reload varnish` doesn't work.
-
-`varnishadm` doesn`t work if varnishd is down.
+* do loading new vcl and connecting to label
+`varnishadm vcl.load katiska-orig-$(date +%s) /etc/varnish/sites/katiska.eu.vcl && varnishadm vcl.list`
+`vcl.list` gives list all loaded VCLs and labels. Check what is name of time stamped one, and
+`varnishadm vcl.label katiska katiska-orig-1746614848`
+Now is new VCL loaded and linked to right label. Samething than `systemctl reload varnish` but now it is done per site. That system gives ypu fast way to roll back, if/when needed. Except if you crashed varnishd, because the `varnishadm` doesn`t work. So test your syntax before reloading/restart.
+* do you want to get rid off old loads? `varnishadm vcl.discard katiska-orig`
 
 ## My opinion
 
-This is one solution when is using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl with site vcls from here (that repo has some issues per se) could be the road with smallest bumps.
+This is one solution when using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl with site vcls from here (that repo has some issues per se) could be the road with smallest bumps.
 
