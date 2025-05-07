@@ -105,11 +105,17 @@ HEADS UP: I don't think anything of that is really issue anymore. it has fixed n
 * do: `varnishd -C -f /etc/varnish/sites/site.vcl`
 
 `systemctl reload varnish` doesn't work.
+
 * do loading new vcl and connecting to label
+
 `varnishadm vcl.load katiska-orig-$(date +%s) /etc/varnish/sites/katiska.eu.vcl && varnishadm vcl.list`
-`vcl.list` gives list all loaded VCLs and labels. Check what is name of time stamped one, and
+
+`vcl.list` gives list all loaded VCLs and labels. Check what is name of time stamped one, and then
+
 `varnishadm vcl.label katiska katiska-orig-1746614848`
-Now is new VCL loaded and linked to right label. Samething than `systemctl reload varnish` but now it is done per site. That system gives ypu fast way to roll back, if/when needed. Except if you crashed varnishd, because the `varnishadm` doesn`t work. So test your syntax before reloading/restart.
+
+Now is the new VCL loaded and linked to right label. Same thing than `systemctl reload varnish` but now it must be done per site. That system gives ypu fast way to roll back, if/when needed. Except if you crashed varnishd, because the `varnishadm` doesn`t work. So test your syntax before reloading/restart.
+
 * do you want to get rid off old loads? `varnishadm vcl.discard katiska-orig`
 
 ## My opinion
