@@ -73,10 +73,6 @@ sub vcl_recv {
 	) {
 		set req.backend_hint = default;
 	} 
-	
-	#if (req.http.host == "git.eksis.one") { set req.backend_hint = gitea; }
-
-	# Because I'm in deep shit, but Varnish is still alive...
 	return(pipe);
 	
 # That's it. We are ready here.
