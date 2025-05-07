@@ -22,6 +22,9 @@ import std;
 # from geoip package, needs separate compiling per Varnish version
 #import geoip2;		# Load the GeoIP2 by MaxMind
 
+# 301 redirect of old hosts
+include "/etc/varnish/ext/301host.vcl";
+
 # fake, never-used backend to silence the compiler
 backend fake {
 	.host = "0:0";
@@ -50,6 +53,8 @@ sub vcl_init {
 
 sub vcl_recv {
 	
+	## Redirecting old domains to new one
+	call new_one;
 
 	## Finally we are heading to sites
 	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
