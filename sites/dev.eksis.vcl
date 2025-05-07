@@ -28,7 +28,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-import accept;		# Fix Accept-Language
+#import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # Banning by ASN (uses geoip-VMOD)
@@ -42,9 +42,6 @@ include "/etc/varnish/ext/probes.vcl";
 
 # Bots with purpose
 include "/etc/varnish/ext/nice-bot.vcl";
-
-# Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -118,7 +115,7 @@ sub vcl_init {
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
-	new lang = accept.rule("fi");
+	#new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
@@ -134,13 +131,13 @@ sub vcl_init {
 sub vcl_recv {
 	
 	set req.backend_hint = sites;
-	
-        ## just for this virtual host
+
+	## just for this virtual host
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        #return(pipe);	
-	
+        #return(pipe);
+
 	### The work starts here
 
 	## certbot gets bypass route
@@ -149,7 +146,7 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	## GeoIP-blockinh
+	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
 	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
@@ -169,7 +166,7 @@ sub vcl_recv {
 	
 	# Quite often russians lie origin country, but are declaring russian as language
 	if (req.http.Accept-Language ~
-                "(ru_RU|ru-RU|ru$)"
+                "ru"
 	) {
                 std.log("banned language: " + req.http.Accept-Language);
 		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
@@ -190,8 +187,6 @@ sub vcl_recv {
 
 	## Redirecting http/80 to https/443
         ## This could, and perhaps should, do on Nginx but certbot likes this better
-        ## I assume this could be done in default.vcl too but I don't know if
-        ## X-Forwarded-Proto would come here then
         if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
         (req.http.Scheme && req.http.Scheme != "https")) {
                 return(synth(750));
@@ -221,7 +216,7 @@ sub vcl_recv {
 	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
-	set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
+	#set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
@@ -271,7 +266,12 @@ sub vcl_recv {
 		set req.url = regsub(req.url, "\?&", "?");
 		set req.url = regsub(req.url, "\?$", "");
 	}
-
+		
+	## URL changes by ext/manipulate.vcl, mostly fixed search strings
+	#if (req.http.x-bot == "visitor") {
+	#	call new_direction;
+	#}
+	
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
 	## so that backend doesn’t add CORS headers.
 	set req.http.X-Saved-Origin = req.http.Origin;
@@ -374,7 +374,7 @@ sub vcl_recv {
                 return(pass);
         }
 
-	## Fix Wordpress visual editorand login issues, must be the first one as url requests to work (well, not exacly first...)
+	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work (well, not exacly first...)
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
@@ -389,14 +389,14 @@ sub vcl_recv {
 	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
 	# But why _pk_ cookies passes?
 	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass,woocommerce_cart_hash,woocommerce_items_in_cart,wp_woocommerce_session_");
+	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
 	set req.http.cookie = cookie.get_string();
 
 	# Don' let empty cookies travel any further
 	if (req.http.cookie == "") {
 		unset req.http.cookie;
 	}
-
+	
 	## Do not cache AJAX requests.
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
 		return(pass);
@@ -448,7 +448,7 @@ sub vcl_recv {
 		unset req.http.cookie;
 		return(hash);
 	}
-	
+		
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
 	# This must be before passing wp-admin
 	if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
@@ -465,7 +465,7 @@ sub vcl_recv {
 	if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
 		return(pass);
 	}
-
+	
 	## REST API 
         # I don't want to fill RAM for benefits of bots.
         
@@ -494,7 +494,7 @@ sub vcl_recv {
 	}
 
 	## Hit everything else
-	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
+	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|checkout|addons|loggedout|lost-password)") {
 		unset req.http.cookie;
 	}
 
@@ -503,7 +503,7 @@ sub vcl_recv {
 	# Every other VCL examples use this really early, but those are really old and 
 	# I'm not so sure if those are actually ever tested in production.
 	set req.url = std.querysort(req.url);
-	
+
 	## Let's clean User-Agent, just to be on safe side
         # It will come back at vcl_hash, but without separate cache
         # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve >
@@ -512,7 +512,12 @@ sub vcl_recv {
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
 
-	## And everything here will go into cache
+	## Because vmod Accept isn't in use, we have to remove Accept-Language, because there is no need to cache with it.
+	# Let's tranfer to response anyway
+	set req.http.x-language = req.http.Accept-Language;
+	unset req.http.Accept-Language;
+
+	## Everything else goes into cache
 	return(hash);
 
 # End of this one	
@@ -547,7 +552,7 @@ sub vcl_hash {
 
 	## Caching per language, that's why we normalized this
 	# Because I don't have multilingual, everything goes under "fi"
-	hash_data(req.http.Accept-Language);
+	#hash_data(req.http.Accept-Language);
 
 	## Return of User-Agent, but without caching
 	# Now I can send User-Agent to backend for 404 logging etc.
@@ -555,6 +560,12 @@ sub vcl_hash {
 	if (req.http.x-agent) {
 		set req.http.User-Agent = req.http.x-agent;
 		unset req.http.x-agent;
+	}
+
+	# Same thing with Accept-Language
+	if (req.http.x-language) {
+		set req.http.Accept-Language = req.http.x-language;
+		unset req.http.x-language;
 	}
 
 	## The end
@@ -670,14 +681,6 @@ sub vcl_backend_response {
 		set beresp.uncacheable = true;
 	}
 	
-	## Give relative short TTL to private ones
-	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-#	if (beresp.http.cache-control ~ "private") {
-#                set beresp.uncacheable = true;
-#		set beresp.ttl = 7200s; # 2h
-#	}
-
-
 	## ESI is enabled and now in use if needed
 	# except... I didn't configured this on MISS
 	if (beresp.http.Surrogate-Control ~ "ESI/1.0") {
@@ -685,19 +688,213 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	## How long Varnish will keep objects is guided by ext/cache-ttl.vcl
-	call time_to_go;
+	###  How long Varnish will keep objects aka. TTL -->
+
+	## Ordinary default; how long Varnish will keep objects
+        # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
+        #
+	# Server must reboot about once in month so let's use it
+        # Backend may want something different, but we don't care
+        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
+        #
+	# This I used earlier
+	#if (beresp.http.cache-control !~ "s-maxage") {
+	#	set beresp.ttl = 30d;
+	#} else {
+		# or if you will pass TTL to other intermediate caches as CDN, otherwise they will use maxage
+	#	set beresp.http.cache-control = "s-maxage=31536000, " + beresp.http.cache-control;
+	#}
+	#
+	# This I use now
+	# I make Varnish cache time x, but I'll tell to user caching very shorter time, because they re-visit quote rarely, and
+	# I force them download fresh content
+	# This is default, and can or will be overdriven later.
+	if ( beresp.status == 200 || beresp.ttl > 0s) {
+                unset beresp.http.expires;
+		unset beresp.http.cache-control;
+
+                # Set the clients TTL on this object
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+
+                #Set how long Varnish will keep it
+                set beresp.ttl = 7d;
+
+                # I don't know why I'm doing this
+		set beresp.http.X-Varnish = bereq.xid;
+	}	
+
+	## Set hit-for-pass for two minutes if TTL is 0 and response headers
+  	## allow for validation. 
+	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
+	# if verification is allowed and use user's or intermediate cache.
+	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+		return(pass(120s));
+	}
+
+        ## Cache some responses only short period
+        # Can I do beresp.status == 302 || beresp.status == 307 ?
+        if (beresp.status == 404) {
+                unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=300";
+                set beresp.ttl = 1h;
+        }
+
+	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
+	# The idea here must be that first try doesn't go in cache, so let's do another round
+       if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+              set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+              set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+              return(retry);
+      }
+
+        if (beresp.status == 410 && beresp.http.location ~ "^https?://[^/]+/") {
+               set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
+               set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
+               return(retry);
+        }
+
+	## 301/410 are quite static, so let's change TTL
+        if (beresp.status == 301 || beresp.status == 410) {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 1y;
+        }
+
+	## Give relative short TTL to private ones
+        # Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
+#       if (beresp.http.cache-control ~ "private") {
+#                set beresp.uncacheable = true;
+#               set beresp.ttl = 7200s; # 2h
+#       }
+
+	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
+        # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
+
+        # .css and .js are relatively long lasting; this can be an issue after updating, though
+        if (beresp.http.Content-Type ~ "^text/(css|javascript)") {
+		# This I did earlier...
+	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+        #                unset beresp.http.Cache-Control;
+        #                unset beresp.http.set-cookie;
+        #        }
+        #        set beresp.ttl = 1y;
+		# ...but because I set up cache-control in the beginning, all I do now is cleaning cookies
+		unset beresp.http.set-cookie;
+        }
+
+        # These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|csv|doc|docx|eot|gz|otf|pdf|ppt|pptx|rtf|tar|tbz|tgz|ttf|txt|txz|xls|xlsx)") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.ttl = 12h;
+                set beresp.do_stream = true;
+        }
+
+        # Images don't change
+        if (beresp.http.Content-Type ~ "^(image)/") {
+                # again, earlier this way...
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                        unset beresp.http.set-cookie;
+                #}
+                #set beresp.ttl = 600s;
+        }
+
+	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
+        # Most of these should be in CDN, but I have some MP3s behind backend
+        # Is this really needed anymore? AFAIK Varnish should do this automatic.
+        if (beresp.http.Content-Type ~ "^(video|audio)/") {
+		# I'm cleaning unnecessary if
+                #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+                        unset beresp.http.Cache-Control;
+                #}
+                set beresp.ttl = 2h; # longer TTL just eats RAM
+		unset beresp.http.set-cookie;
+                set beresp.do_stream = true;
+        }
+
+	## RSS and other feeds like podcast can be cached
+        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
+	# so 24h delay is acceptable
+        if (beresp.http.Content-Type ~ "text/xml") {
+		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
+			unset beresp.http.Cache-Control;
+		#}
+		#set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 86400s;
+        }
+
+        ## Robots.txt is really static, but let's be on safe side
+        # Against all claims bots check robots.txt almost never, so caching doesn't help much
+        if (bereq.url ~ "/robots.txt") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+        ## ads.txt and sellers.json is really static to me, but let's be on safe side
+        if (bereq.url ~ "^/(ads.txt|sellers.json)") {
+                unset beresp.http.cache-control;
+                set beresp.http.cache-control = "max-age=604800";
+                set beresp.ttl = 30d;
+        }
+
+	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
+        if (bereq.url ~ "sitemap") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 1h;
+        }
+
+        ## Tags this should be same than TTL of feeds. I don't have.
+        if (bereq.url ~ "(avainsana|tag)") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=86400"; # 24h
+                set beresp.ttl = 24h;
+        }
+
+        ## Search results, mostly Wordpress if I'm guessing right
+        # Normally those querys should pass but I want to cache answers shortly
+        # Caching or not doesn't matter because users don't search too often anyway
+        if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
+                unset beresp.http.cache-control;
+                #set beresp.http.cache-control = "max-age=120";
+                set beresp.ttl = 5m;
+        }
+		
+	## I have an issue with one cache-control value from WordPress when speedtesting
+	if (bereq.url ~ "/icons.ttf\?pozjks") {
+		unset beresp.http.set-cookie;
+		set beresp.http.cache-control = "max-age=31536000";
+	}
+
+	## WordPress archive page of podcasts
+	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.cache-control;
+		set beresp.http.cache-control = "max-age=43200"; # 12h for client
+		set beresp.ttl = 2d;
+	}
+		
+	## Some admin-ajax.php calls can be cached by Varnish
+	# Except... it is almost always POST or OPTIONS and those are uncacheable
+	if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+		unset beresp.http.set-cookie;
+		set beresp.ttl = 1d;
+		set beresp.grace = 1d;
+	}
+
+	##### <-- The end of setting TTLs
 	
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
         unset beresp.http.Vary;
         
         # I normalize Accept-Language, so it can be in vary
-	set beresp.http.Vary = "Accept-Language";
+	#set beresp.http.Vary = "Accept-Language";
         
 	# Accept-Encoding could be in Vary, because it changes content
 	# But it is handled internally by Varnish.
-	set beresp.http.Vary = beresp.http.Vary + ",Accept-Encoding";
+	set beresp.http.Vary = "Accept-Encoding";
 	
 	# User-Agent was sended to backend, but removing it from Vary prevents Varnish to use it for caching
 	# Is this really needed? I removed UA and backend doesn't set it up, but uses what it gets from http.req
@@ -743,6 +940,9 @@ sub vcl_backend_response {
 	#	set beresp.http.X-Trace = regsub(server.identity, "^([^.]+),?.*$", "\1")+"->"+regsub(beresp.backend.name, "^(.+)\((?:[0-9]{1,3}\.){3}([0-9]{1,3})\)","\1(\2)");
 	#}
 
+	## Unset Accept-Language, if backend gave one. We still want to keep it outside cache.
+	unset beresp.http.Accept-Language;
+
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
 	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
@@ -755,12 +955,6 @@ sub vcl_backend_response {
 #######################vcl_deliver#####################
 #
 sub vcl_deliver {
-
-	## Still protecting WooCommerce, but trying to show some extra
-	# Just a remainder, because I use this VCL as a boilerplate too. This host isn't WooCommerce
-	#if (resp.http.host == "store.katiska.eu") {
-	#	return(deliver);
-	#}
 
 	## Damn, backend is down (or the request is not allowed; almost same thing)
 	if (resp.status == 503) {
@@ -779,7 +973,7 @@ sub vcl_deliver {
 	unset resp.http.x-host;
 
 	## Vary to browser
-	set resp.http.Vary = "Accept-Language,Accept-Encoding";
+	set resp.http.Vary = "Accept-Encoding";
 
 	## Let's add the origin by cors.vcl. But I'm using * so...
 	# ext/cors.vcl
@@ -835,7 +1029,7 @@ sub vcl_deliver {
 	## Custom headers, not so serious thing 
 	set resp.http.Your-Agent = req.http.User-Agent;
 	set resp.http.Your-IP = req.http.X-Real-IP;
-	set resp.http.Your-Language = req.http.Accept-Language;
+	#set resp.http.Your-Language = req.http.Accept-Language;
 
 	## Don't show funny stuff to bots
 	if (req.http.x-bot == "visitor") {
