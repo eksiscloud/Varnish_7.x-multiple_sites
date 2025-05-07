@@ -409,7 +409,7 @@ sub vcl_recv {
 	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
 	# But why _pk_ cookies passes?
 	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass,woocommerce_cart_hash,woocommerce_items_in_cart,wp_woocommerce_session_");
+	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
 	set req.http.cookie = cookie.get_string();
 
 	# Don' let empty cookies travel any further
@@ -510,7 +510,7 @@ sub vcl_recv {
 	## Hit everything else
 	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
 	# Again, 'tuote' is product in finnish
-	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|cart|my-account|wc-api|checkout|addons|loggedout|lost-password|tuote)") {
+	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
 		unset req.http.cookie;
 	}
 
@@ -1048,7 +1048,7 @@ sub vcl_deliver {
 	## Custom headers, not so serious thing 
 	set resp.http.Your-Agent = req.http.User-Agent;
 	set resp.http.Your-IP = req.http.X-Real-IP;
-	set resp.http.Your-Language = req.http.Accept-Language;
+	#set resp.http.Your-Language = req.http.Accept-Language;
 
 	## Don't show funny stuff to bots
 	if (req.http.x-bot == "visitor") {
