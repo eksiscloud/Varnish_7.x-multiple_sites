@@ -132,6 +132,12 @@ sub cute_bot_allowance {
 		set req.http.x-user-agent = req.http.User-Agent;
 	}
 
+	if (req.http.User-Agent ~ "OAI-SearchBot") {
+		set req.http.x-bot = "nice";
+		set req.http.User-Agent = "OpenAI Search";
+		set req.http.x-user-agent = req.http.User-Agent;
+	}
+
 	if (req.http.User-Agent ~ "Overcast") { 
 		set req.http.x-bot = "nice"; 
 		set req.http.User-Agent = "Overcast"; 
@@ -175,10 +181,13 @@ sub cute_bot_allowance {
 		set req.http.x-user-agent = req.http.User-Agent;
 	}
 
-	if (req.http.User-Agent ~ "Amazon-Advertising-ad-standards-bot") {
-		set req.http.x-bot = "nice";
-                set req.http.User-Agent = "Amazon";
-                set req.http.x-user-agent = req.http.User-Agent;
+	if (
+		req.http.User-Agent ~ "Amazon-Advertising-ad-standards-bot" 
+		|| req.http.User-Agent ~ "Amazonbot"
+		) {
+			set req.http.x-bot = "nice";
+			set req.http.User-Agent = "Amazon";
+			set req.http.x-user-agent = req.http.User-Agent;
         }
 
 	if (req.http.User-Agent ~ "^MeWeBot") { 
