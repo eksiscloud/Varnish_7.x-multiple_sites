@@ -31,6 +31,9 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 #import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
+# List of banned countries
+include "/etc/varnish/ext/ban-countries.vcl";
+
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
@@ -157,12 +160,14 @@ sub vcl_recv {
 	# (well... it is actually, and Fail2ban will do that) 
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
 	# like from Turkey to Finland via Senegal
-	if (req.http.X-Country-Code ~ 
-		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
-	) {
-		std.log("banned country: " + req.http.X-Country-Code);
-		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
-	}
+	# For easier updating of the list ext/ban-countries.vcl
+        call close_doors;
+
+        if (req.http.x-ban-country) {
+                std.log("banned country: " + std.toupper(req.http.x-ban-country));
+                return(synth(403, "Forbidden country: " + std.toupper(req.http.x-ban-country)));
+                unset req.http.x-ban-country;
+        }
 	
 	# Quite often russians lie origin country, but are declaring russian as language
 	if (req.http.Accept-Language ~
