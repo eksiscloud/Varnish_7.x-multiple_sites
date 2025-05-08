@@ -814,7 +814,7 @@ sub vcl_backend_response {
         # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
 
         # .css and .js are relatively long lasting; this can be an issue after updating, though
-        if (beresp.http.Content-Type ~ "^text/(css|javascript)") {
+        if (bereq.http.Content-Type ~ "^text/(css|javascript)") {
 		# This I did earlier...
 	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
         #                unset beresp.http.Cache-Control;
@@ -834,7 +834,7 @@ sub vcl_backend_response {
         }
 
         # Images don't change
-        if (beresp.http.Content-Type ~ "^(image)/") {
+        if (bereq.http.Content-Type ~ "^(image)/") {
                 # again, earlier this way...
 		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
                         unset beresp.http.Cache-Control;
@@ -859,7 +859,7 @@ sub vcl_backend_response {
 	## RSS and other feeds like podcast can be cached
         # Podcast services are checking feed way too often, and I'm quite lazy to publish,
 	# so 24h delay is acceptable
-        if (beresp.http.Content-Type ~ "text/xml") {
+        if (bereq.http.Content-Type ~ "text/xml") {
 		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
 			unset beresp.http.Cache-Control;
 		#}
