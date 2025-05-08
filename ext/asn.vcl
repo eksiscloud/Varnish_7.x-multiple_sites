@@ -28,6 +28,7 @@ sub asn_name {
 		|| req.http.x-asn ~ "railnet"				# Railnet LLM, US
 		|| req.http.x-asn ~ "scalaxy"				# xWEBltd, actually RU using NL and identifying as GB
 		|| req.http.x-asn ~ "server-mania"			# B2 Net Solutions Inc., CA
+		|| req.http.x-asn ~ "suddenlink-communications"		# Suddenlink Communications, US
 		|| req.http.x-asn ~ "reliablesite"			# Dedires llc, GB from PSE
 		|| req.http.x-asn ~ "tefincomhost"			# Packethub S.A., NordVPN, FI, PA
 		|| req.http.x-asn ~ "whg-network"			# Web Hosted Group Ltd, GB
