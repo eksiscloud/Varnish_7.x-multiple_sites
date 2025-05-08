@@ -31,6 +31,9 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 #import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
+# List of banned countries
+include "/etc/varnish/ext/ban-countries.vcl";
+
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
@@ -168,14 +171,16 @@ sub vcl_recv {
 	# (well... it is actually, and Fail2ban will do that) 
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
 	# like from Turkey to Finland via Senegal
-	if (req.http.X-Country-Code ~ 
-		"(bd|bg|by|cn|cr|cz|ec|fr|ro|rs|ru|sy|hk|id|in|iq|ir|kr|ly|my|ph|pl|sc|sg|tr|tw|ua|vn)"
-	) {
-		std.log("banned country: " + req.http.X-Country-Code);
-		return(synth(403, "Forbidden country: " + std.toupper(req.http.X-Country-Code)));
-	}
-	
 	# Quite often russians lie origin country, but are declaring russian as language
+	# For easier updating of the list ext/ban-countries.vcl
+        call close_doors;
+
+        if (req.http.x-ban-country) {
+                std.log("banned country: " + std.toupper(req.http.x-ban-country));
+                return(synth(403, "Forbidden country: " + std.toupper(req.http.x-ban-country)));
+                unset req.http.x-ban-country;
+        }
+
 	if (req.http.Accept-Language ~
                 "(ru)"
 	) {
@@ -804,7 +809,7 @@ sub vcl_backend_response {
         # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
 
         # .css and .js are relatively long lasting; this can be an issue after updating, though
-        if (beresp.http.Content-Type ~ "^text/(css|javascript)") {
+        if (bereq.http.Content-Type ~ "^text/(css|javascript)") {
 		# This I did earlier...
 	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
         #                unset beresp.http.Cache-Control;
@@ -824,7 +829,7 @@ sub vcl_backend_response {
         }
 
         # Images don't change
-        if (beresp.http.Content-Type ~ "^(image)/") {
+        if (bereq.http.Content-Type ~ "^(image)/") {
                 # again, earlier this way...
 		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
                         unset beresp.http.Cache-Control;
@@ -836,7 +841,7 @@ sub vcl_backend_response {
 	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
-        if (beresp.http.Content-Type ~ "^(video|audio)/") {
+        if (bereq.http.Content-Type ~ "^(video|audio)/") {
 		# I'm cleaning unnecessary if
                 #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
                         unset beresp.http.Cache-Control;
@@ -849,7 +854,7 @@ sub vcl_backend_response {
 	## RSS and other feeds like podcast can be cached
         # Podcast services are checking feed way too often, and I'm quite lazy to publish,
 	# so 24h delay is acceptable
-        if (beresp.http.Content-Type ~ "text/xml") {
+        if (bereq.http.Content-Type ~ "text/xml") {
 		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
 			unset beresp.http.Cache-Control;
 		#}
