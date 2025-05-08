@@ -261,6 +261,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "panscient.com"
 		|| req.http.User-Agent ~ "PaperLiBot"
 		|| req.http.User-Agent ~ "PCNBrowser"
+		|| req.http.User-Agent ~ "peer39_crawler"
 		|| req.http.User-Agent ~ "PetalBot"						# same as AspiegelBot
 		|| req.http.User-Agent ~ "PhantomJS"
 		|| req.http.User-Agent ~ "PHist/"
