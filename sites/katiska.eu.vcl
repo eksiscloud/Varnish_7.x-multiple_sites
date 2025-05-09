@@ -484,7 +484,13 @@ sub vcl_recv {
 		unset req.http.cookie;
 		return(hash);
 	}
-		
+	
+	# Let's cache images, even it is a stupid move
+	if (req.http.Content-Type ~ "^(image)/") {
+		unset req.http.cookie;
+		return(hash);
+	}
+	
 	## Some devices, mainly from Apple, send urls ending /null
 	if (req.url ~ "/null$") {
 		set req.url = regsub(req.url, "/null", "/");
