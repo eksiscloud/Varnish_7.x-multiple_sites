@@ -1,5 +1,9 @@
 sub new_one {
 
+	if (req.http.host == "www.katiska.info" && req.http.url ~ "^/wp-login") {
+		set req.backend_hint = default;
+		return(synth(666));
+	} 
 	if (req.http.host ~ "www.katiska.info") {
 		set req.backend_hint = default;
 		return(synth(701, "https://www.katiska.eu" + req.url));
