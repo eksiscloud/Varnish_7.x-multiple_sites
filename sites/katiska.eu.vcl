@@ -474,10 +474,10 @@ sub vcl_recv {
 		return(pass);
 	}
 	
-	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read the file first.
+	## Large static audio files will be cached and streamed. I don't host videos, so let them be.
 	# The job will be done at vcl_backend_response
 	# But is this really needed nowadays?
-	if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
+	if (req.Content-Type ~ "audio/") {
 		unset req.http.cookie;
 		return(hash);
 	}
@@ -490,7 +490,7 @@ sub vcl_recv {
 	}
 	
 	# Let's cache images, even it is a stupid move
-	if (req.http.Content-Type ~ "^(image)/") {
+	if (req.http.Content-Type ~ "image/") {
 		unset req.http.cookie;
 		return(hash);
 	}
@@ -865,7 +865,7 @@ sub vcl_backend_response {
 		unset beresp.http.set-cookie;
                 set beresp.do_stream = true;
         }
-
+y
 	## RSS and other feeds like podcast can be cached
         # Podcast services are checking feed way too often, and I'm quite lazy to publish,
 	# so 24h delay is acceptable
@@ -978,7 +978,7 @@ sub vcl_backend_response {
 	}
 	
 	## Do I really have to tell this again?
-	# In-build, not needed. On other hand, it sends uncacheable right away to backend.
+	# In-build, not needed. On other hand, it sends uncacheable right away to user.
 	if (bereq.method == "POST") {
 		set beresp.uncacheable = true;
 		return(deliver);
