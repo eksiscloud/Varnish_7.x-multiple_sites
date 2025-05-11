@@ -234,6 +234,27 @@ sub vcl_recv {
 	set req.http.host = std.tolower(req.http.host);
 	set req.http.host = regsub(req.http.host, ":[0-9]+", "");
 	
+	## Only deal with "normal" types
+	# In-build rules. Those aren't needed, unless return(...) forces skip it.
+	# Heads up! BAN/PURGE/REFRESH must be done before this or declared here. Unless those don't work when purging or banning.
+	# Heads up! If you are filtering methods in Nginx/Apache2 allow same ones there too
+	if (req.method != "GET" &&
+	req.method != "HEAD" &&
+	req.method != "PUT" &&
+	req.method != "POST" &&
+	req.method != "TRACE" &&
+	req.method != "OPTIONS" &&
+	req.method != "PATCH" &&
+	req.method != "DELETE" &&
+	req.method != "PURGE" &&
+	req.method != "BAN" &&
+	req.method != "REFRESH"
+	) {
+	# Non-RFC2616 or CONNECT which is weird.
+	# Why send the packet upstream, while the visitor is using a non-valid HTTP method?
+		return(synth(405, "Non-valid HTTP method!"));
+	}
+
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
 	#set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
@@ -364,23 +385,6 @@ sub vcl_recv {
 	#			set req.http.X-Country-Code = "fi";
 	#	}
 	#}
-	
-	## Only deal with "normal" types
-	# In-build rules. Those aren't needed, unless return(...) forces skip it.
-	# Heads up! BAN/PURGE/REFRESH must be done before this or declared here. Unless those don't work when purging or banning.
-	if (req.method != "GET" &&
-	req.method != "HEAD" &&
-	req.method != "PUT" &&
-	req.method != "POST" &&
-	req.method != "TRACE" &&
-	req.method != "OPTIONS" &&
-	req.method != "PATCH" &&
-	req.method != "DELETE"
-	) {
-	# Non-RFC2616 or CONNECT which is weird.
-	# Why send the packet upstream, while the visitor is using a non-valid HTTP method?
-		return(synth(405, "Non-valid HTTP method!"));
-	}
 	
 	## Only GET and HEAD are cacheable methods AFAIK 
         # In-build rule, doesn't needed here
