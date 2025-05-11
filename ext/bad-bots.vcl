@@ -14,6 +14,8 @@ sub bad_bot_detection {
 # These are mostly handled by Nginx giving error 444
 # So, this vcl is more or less just backup. 
 #
+# Just using ($server_protocol = HTTP/1.0) { return 444; } in Nginx blocks plenty of these
+
 	if (
 		   req.http.User-Agent == "^$"							# Nginx is passing these two
 		|| req.http.User-Agent == "-"							# because I couldn't success with LUA
