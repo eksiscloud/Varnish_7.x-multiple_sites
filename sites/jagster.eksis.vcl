@@ -446,13 +446,13 @@ sub vcl_recv {
 		return(pass);
 	}
 	
-	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read the file first.
-	# The job will be done at vcl_backend_response
-	# But is this really needed nowadays?
-	if (req.url ~ "^[^?]*\.(avi|mkv|mov|mp3|mp4|mpeg|mpg|ogg|ogm|wav)(\?.*)?$") {
-		unset req.http.cookie;
-		return(hash);
-	}
+	## Large static audio files will be cached and streamed. I don't host videos, so let them be.
+        # The job will be done at vcl_backend_response
+        # But is this really needed nowadays?
+        if (req.Content-Type ~ "audio/") {
+                unset req.http.cookie;
+                return(hash);
+        }
 
 	## Cache all static files by Removing all Cookies for static files
 	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
