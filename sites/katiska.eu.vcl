@@ -370,6 +370,7 @@ sub vcl_recv {
 	## Only deal with "normal" types
 	# In-build rules. Those aren't needed, unless return(...) forces skip it.
 	# Heads up! BAN/PURGE/REFRESH must be done before this or declared here. Unless those don't work when purging or banning.
+	# Heads up! If you are filtering methods in Nginx/Apache2 allow same ones there too
 	if (req.method != "GET" &&
 	req.method != "HEAD" &&
 	req.method != "PUT" &&
@@ -377,7 +378,10 @@ sub vcl_recv {
 	req.method != "TRACE" &&
 	req.method != "OPTIONS" &&
 	req.method != "PATCH" &&
-	req.method != "DELETE"
+	req.method != "DELETE" &&
+	req.method != "PURGE" &&
+	req.method != "BAN" &&
+	req.method != "REFRESH"
 	) {
 	# Non-RFC2616 or CONNECT which is weird.
 	# Why send the packet upstream, while the visitor is using a non-valid HTTP method?
