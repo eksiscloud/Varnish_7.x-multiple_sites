@@ -474,21 +474,48 @@ sub vcl_recv {
 		return(pass);
 	}
 	
-	## Large static audio files will be cached and streamed. I don't host videos, so let them be.
-	# The job will be done at vcl_backend_response
-	# But is this really needed nowadays?
-	if (req.Content-Type ~ "audio/") {
-		unset req.http.cookie;
-		return(hash);
-	}
-
 	## Cache all static files by Removing all Cookies for static files
+	# These haven't Content-type, I don't know it or there is another reason to keep this that way.
 	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-	if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
+	if (req.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|xls|xlsx|xz|zip)(\?.*)?$") {
 		unset req.http.cookie;
 		return(hash);
 	}
 	
+	# Text-files are static, so cache it is.
+	# Cache these is equally stupid than caching images, though.
+	# This includes sitemaps, so consider smart TTL and remember: the order matters
+        if (req.Content-Type ~ "text/") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
+	# Fonts, another useless caching strategy
+        if (req.Content-Type ~ "font/") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
+	# Feeds should be cached, but on other side: only bots use them
+        if (req.Content-Type ~ "application/rss+xml") {
+                unset req.http.cookie;
+                return(hash);
+	
+	# JavaScript are operating in user's device, so caching them is no issue. 
+	# But those don't create no load in backend, and need BAN after updates.
+	# Do you even know when Google Ads does updates?
+        if (req.Content-Type ~ "application/javascript") {
+                unset req.http.cookie;
+                return(hash);
+	
+	# Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
+        # The job will be done at vcl_backend_response
+        # But is this really needed nowadays?
+        if (req.Content-Type ~ "(audio|video)/") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
 	# Let's cache images, even it is a stupid move
 	if (req.http.Content-Type ~ "image/") {
 		unset req.http.cookie;
