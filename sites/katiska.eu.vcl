@@ -497,14 +497,14 @@ sub vcl_recv {
         }
 
 	# Feeds should be cached, but on other side: only bots use them
-        if (req.Content-Type ~ "application/rss+xml") {
+        if (req.Content-Type ~ "(application|text)/xml") {
                 unset req.http.cookie;
                 return(hash);
 	
 	# JavaScript are operating in user's device, so caching them is no issue. 
 	# But those don't create no load in backend, and need BAN after updates.
 	# Do you even know when Google Ads does updates?
-        if (req.Content-Type ~ "application/javascript") {
+        if (req.Content-Type ~ "(text|application)/javascript") {
                 unset req.http.cookie;
                 return(hash);
 	
@@ -849,60 +849,52 @@ sub vcl_backend_response {
 
 	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
         # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
-
-        # .css and .js are relatively long lasting; this can be an issue after updating, though
-        if (bereq.http.Content-Type ~ "^text/(css|javascript)") {
-		# This I did earlier...
-	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-        #                unset beresp.http.Cache-Control;
-        #                unset beresp.http.set-cookie;
-        #        }
-        #        set beresp.ttl = 1y;
-		# ...but because I set up cache-control in the beginning, all I do now is cleaning cookies
-		unset beresp.http.set-cookie;
-        }
-
-        # These can be really big and not so often requested. And if there is a rush, those can be fetched
-        if (bereq.url ~ "^[^?]*\.(7z|bz2|csv|doc|docx|eot|gz|otf|pdf|ppt|pptx|rtf|tar|tbz|tgz|ttf|txt|txz|xls|xlsx)") {
+	
+	# This includes .css and .js too.
+	# I'll later finetune this by type and actual files
+	if (bereq.http.Content-Type ~ "^text/") {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
-                set beresp.ttl = 12h;
-                set beresp.do_stream = true;
+	}
+
+	# RSS and other feeds like podcast can be cached
+        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
+        # so 24h delay is acceptable
+        if (bereq.http.Content-Type ~ "^(application|text)/xml") {
+                unset beresp.http.Cache-Control;
+		unset beresp.http.set-cookie;
+                set beresp.ttl = 86400s;  # 24h
+        }
+
+	# Images don't change
+        if (bereq.http.Content-Type ~ "^font/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
         }
 
         # Images don't change
-        if (bereq.http.Content-Type ~ "^(image)/") {
-                # again, earlier this way...
-		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-                        unset beresp.http.Cache-Control;
-                        unset beresp.http.set-cookie;
-                #}
-                #set beresp.ttl = 600s;
+        if (bereq.http.Content-Type ~ "^image/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
         }
 
-	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
+	# Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
         if (beresp.http.Content-Type ~ "^(video|audio)/") {
-		# I'm cleaning unnecessary if
-                #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-                        unset beresp.http.Cache-Control;
-                #}
-                set beresp.ttl = 2h; # longer TTL just eats RAM
+	        unset beresp.http.Cache-Control;
 		unset beresp.http.set-cookie;
+                set beresp.ttl = 2h; # longer TTL just eats RAM
                 set beresp.do_stream = true;
         }
-y
-	## RSS and other feeds like podcast can be cached
-        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
-	# so 24h delay is acceptable
-        if (bereq.http.Content-Type ~ "text/xml") {
-		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-			unset beresp.http.Cache-Control;
-		#}
-		#set beresp.http.cache-control = "max-age=86400"; # 24h
-                set beresp.ttl = 86400s;
-        }
+
+
+	# These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.ttl = 12h;
+                set beresp.do_stream = true;
 
         ## Robots.txt is really static, but let's be on safe side
         # Against all claims bots check robots.txt almost never, so caching doesn't help much
@@ -922,14 +914,12 @@ y
 	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
         if (bereq.url ~ "sitemap") {
                 unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=120";
-                set beresp.ttl = 1h;
+                set beresp.ttl = 86400;  # 24h
         }
 
         ## Tags this should be same than TTL of feeds. I don't have.
         if (bereq.url ~ "(avainsana|tag)") {
                 unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=86400"; # 24h
                 set beresp.ttl = 24h;
         }
 
