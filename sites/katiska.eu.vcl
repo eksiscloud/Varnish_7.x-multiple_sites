@@ -485,33 +485,35 @@ sub vcl_recv {
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
-        if (req.Content-Type ~ "text/") {
+        if (req.http.Content-Type ~ "text/") {
                 unset req.http.cookie;
                 return(hash);
         }
 
 	# Fonts, another useless caching strategy
-        if (req.Content-Type ~ "font/") {
+        if (req.http.Content-Type ~ "font/") {
                 unset req.http.cookie;
                 return(hash);
         }
 
 	# Feeds should be cached, but on other side: only bots use them
-        if (req.Content-Type ~ "(application|text)/xml") {
+        if (req.http.Content-Type ~ "(application|text)/xml") {
                 unset req.http.cookie;
                 return(hash);
-	
+	}
+
 	# JavaScript are operating in user's device, so caching them is no issue. 
 	# But those don't create no load in backend, and need BAN after updates.
 	# Do you even know when Google Ads does updates?
-        if (req.Content-Type ~ "(text|application)/javascript") {
+        if (req.http.Content-Type ~ "(text|application)/javascript") {
                 unset req.http.cookie;
                 return(hash);
+	}
 	
 	# Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
         # The job will be done at vcl_backend_response
         # But is this really needed nowadays?
-        if (req.Content-Type ~ "(audio|video)/") {
+        if (req.http.Content-Type ~ "(audio|video)/") {
                 unset req.http.cookie;
                 return(hash);
         }
@@ -536,7 +538,7 @@ sub vcl_recv {
 	} 
 	
 	# WordPress
-	if ( !req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+	if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
 		return(synth(403, "Unauthorized request"));
 	}
 
@@ -895,6 +897,7 @@ sub vcl_backend_response {
                 unset beresp.http.set-cookie;
                 set beresp.ttl = 12h;
                 set beresp.do_stream = true;
+	}
 
         ## Robots.txt is really static, but let's be on safe side
         # Against all claims bots check robots.txt almost never, so caching doesn't help much
@@ -914,7 +917,7 @@ sub vcl_backend_response {
 	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
         if (bereq.url ~ "sitemap") {
                 unset beresp.http.cache-control;
-                set beresp.ttl = 86400;  # 24h
+                set beresp.ttl = 86400s;  # 24h
         }
 
         ## Tags this should be same than TTL of feeds. I don't have.
