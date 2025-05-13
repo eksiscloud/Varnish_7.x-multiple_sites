@@ -64,6 +64,7 @@ sub vcl_recv {
 	if (
 	req.http.host == "www.katiska.eu" ||
 	req.http.host == "www.eksis.one" ||
+	req.http.host == "www.poochierevival.info" ||
 	req.http.host == "dev.eksis.one" ||
 	req.http.host == "jagster.eksis.one" ||
 	req.http.host == "selko.katiska.eu" ||

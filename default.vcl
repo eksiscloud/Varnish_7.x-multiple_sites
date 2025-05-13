@@ -57,30 +57,40 @@ sub vcl_recv {
 	call new_one;
 
 	## Finally we are heading to sites
-	if (req.http.host == "www.katiska.eu" || req.http.host == "katiska.eu") {
+	if (req.http.host == "www.katiska.eu") {
 		return (vcl(katiska));
 	} 
+	
 	if (req.http.host == "store.katiska.eu") {
 		return(vcl(store));
 	} 
+	
 	if (req.http.host == "selko.katiska.eu") {
 		return(vcl(selkokatiska));
 	} 
-	if (req.http.host == "www.eksis.one" || req.http.host == "eksis.one") {
+	
+	if (req.http.host == "www.eksis.one") {
                 return(vcl(eksisone));
         } 
+	
+	if (req.http.host == "www.poochierevival.info") {
+		return(vcl(poochie));
+	}
+
 	if (req.http.host == "jagster.eksis.one") {
                 return(vcl(jagster));
-        } 
+        }
+ 
 	if (req.http.host == "dev.eksis.one") {
                 return(vcl(dev));
         } 
+
 	if (req.http.host == "stats.eksis.eu") {
                 return(vcl(stats));
 	}	
+
 	return (synth(404));
 	
-
 ## End of this road
 }
 
