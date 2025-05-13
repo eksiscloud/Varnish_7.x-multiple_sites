@@ -1,11 +1,14 @@
-# These are ~/.bash_aliases I use to make my life a little bit easier.
-# Some of this might be smarter to use as script, but I don't know how.
-# So my solution after updating a VCL, let's say sites/katiska.eu.vcl, is this:
-#
+These are ~/.bash_aliases I use to make my life a little bit easier.
+Some of this might be smarter to use as script, but I don't know how.
+
+So my solution after updating a VCL, let's say sites/katiska.eu.vcl, is this:
+```
 # v-ok sites/katiska.vcl
 # load-katiska
 # label-katiska <name-of-just-loaded-new-vcl-version>
-
+```
+And the relevant content:
+```
 # VCL
 alias v-ok='varnishd -C -f '
 alias load-root='varnishadm vcl.load root-orig-$(date +%s) /etc/varnish/default.vcl && varnishadm vcl.list'
@@ -33,3 +36,4 @@ alias ban-katiska='varnishadm "ban req.http.host == www.katiska.eu" && varnishad
 alias ban-one='varnishadm "ban req.http.host == www.eksis.one" && varnishadm ban.list'
 alias ban-jagster='varnishadm "ban req.http.host == www.jagster.fi" && varnishadm ban.list'
 alias purge='curl -X PURGE '
+```
