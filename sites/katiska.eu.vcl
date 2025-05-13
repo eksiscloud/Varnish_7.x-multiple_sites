@@ -920,9 +920,10 @@ sub vcl_backend_response {
                 set beresp.ttl = 86400s;  # 24h
         }
 
-        ## Tags this should be same than TTL of feeds. I don't have.
+        ## Tags this should be same than TTL of feeds. I don't have, if I remember right.
         if (bereq.url ~ "(avainsana|tag)") {
-                unset beresp.http.cache-control;
+		unset beresp.http.set-cookie;
+	        unset beresp.http.cache-control;
                 set beresp.ttl = 24h;
         }
 
@@ -930,6 +931,7 @@ sub vcl_backend_response {
         # Normally those querys should pass but I want to cache answers shortly
         # Caching or not doesn't matter because users don't search too often anyway
         if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
+		unset beresp.http.set-cookie;
                 unset beresp.http.cache-control;
                 #set beresp.http.cache-control = "max-age=120";
                 set beresp.ttl = 5m;
@@ -943,6 +945,7 @@ sub vcl_backend_response {
 
 	## WordPress archive page of podcasts
 	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.set-cookie;
 		unset beresp.http.cache-control;
 		set beresp.http.cache-control = "max-age=43200"; # 12h for client
 		set beresp.ttl = 2d;
