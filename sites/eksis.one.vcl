@@ -469,7 +469,7 @@ sub vcl_recv {
 	## Large static audio files will be cached and streamed. I don't host videos, so let them be.
         # The job will be done at vcl_backend_response
         # But is this really needed nowadays?
-        if (req.Content-Type ~ "audio/") {
+        if (req.http.Content-Type ~ "audio/") {
                 unset req.http.cookie;
                 return(hash);
         }
