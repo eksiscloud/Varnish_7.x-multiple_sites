@@ -401,6 +401,11 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## .well-known should not be cached
+	if (req.url ~ "^/.well-known/") {
+		return(pass);
+	}
+
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
         # This must be before passing wp-admin
 #        if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
@@ -796,6 +801,14 @@ sub vcl_backend_response {
                 # Helps to group requests in varnishlog
 		set beresp.http.X-Varnish = bereq.xid;
 	}	
+
+	## .well-known
+	if (bereq.url ~ "^/.well-known/") {
+		unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
+                set beresp.ttl = 0s;
+		return(deliver);
+	}
 
 	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
 	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || bereq.url ~ "/(login|lataus)" ||  bereq.url ~ "preview=true") {
