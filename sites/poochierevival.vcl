@@ -590,7 +590,8 @@ sub vcl_recv {
 	unset req.http.Accept-Language;
 
 	## Cache all others requests if they reach this point.
-	return(hash);
+	# Will this break in-build? Commented until I'm sure
+	#return(hash);
 
 # End of this one	
 } 
