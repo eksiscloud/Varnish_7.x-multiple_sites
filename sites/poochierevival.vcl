@@ -136,9 +136,9 @@ sub vcl_init {
 
 
 ############### vcl_recv #################
-## We should have here only statments without return(...)
-## because such jumps to buildin.vcl passing everything in all.common.vcl and hosts' vcl
+## We should have here only statments without return(...) or is must be unconditionally and stop process
 ## The solution has explained here: https://www.getpagespeed.com/server-setup/varnish/varnish-virtual-hosts
+## Here we are telling to Varnish what to do and what to cache or not. This is not for backend or i.e. browsers
 
 sub vcl_recv {
 	
@@ -153,7 +153,7 @@ sub vcl_recv {
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        return(pipe);	
+        #return(pipe);	
 
 	### The work starts here
 
@@ -403,9 +403,9 @@ sub vcl_recv {
 
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
         # This must be before passing wp-admin
-        if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-               return(hash);
-        }
+#        if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+#               return(hash);
+#        }
 
 	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
 	#  before cookie monster to work.
@@ -435,6 +435,9 @@ sub vcl_recv {
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
 		return(pass);
 	}
+
+	## I'm hunting down reason why everthing under wp-admin goes to cache and needs F5
+#	if (!req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)") {
 
 	## Don't cache logged-in user, password reseting and posts behind password
         # Frontend of Wordpress
@@ -471,6 +474,11 @@ sub vcl_recv {
 	# wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer" -H --domains=example.com --show-progress www.example.com
 	# It saves a lot of directories, so think where you are before launching it... A protip: /tmp
 	if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
+		return(pass);
+	}
+
+	## Let's pass Google, because indexing is more important than speed
+	if (req.http.x-user-agent == "Google") {
 		return(pass);
 	}
 	
@@ -734,7 +742,8 @@ sub vcl_miss {
 
 ###################vcl_backend_response#############
 # This will alter everything what a backend responses back to Varnish
-#
+# Affets to what i.e. browsers will do
+
 sub vcl_backend_response {
 
 	## Add name of backend in varnishncsa log
@@ -760,14 +769,6 @@ sub vcl_backend_response {
 		set beresp.uncacheable = true;
 	}
 	
-	## Give relative short TTL to private ones
-	# Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-	#if (beresp.http.cache-control ~ "private") {
-        #        set beresp.uncacheable = true;
-	#	set beresp.ttl = 7200s; # 2h
-	#}
-
-
 	## ESI is enabled and now in use if needed
 	# except... I didn't configured this on MISS
 	if (beresp.http.Surrogate-Control ~ "ESI/1.0") {
@@ -779,50 +780,44 @@ sub vcl_backend_response {
 
 	## Ordinary default; how long Varnish will keep objects
         # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
-        #
-	# Server must reboot about once in month so let's use it
-        # Backend may want something different, but we don't care
-        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
-        #
-	# This I used earlier
-	#if (beresp.http.cache-control !~ "s-maxage") {
-	#	set beresp.ttl = 30d;
-	#} else {
-		# or if you will pass TTL to other intermediate caches as CDN, otherwise they will use maxage
-	#	set beresp.http.cache-control = "s-maxage=31536000, " + beresp.http.cache-control;
-	#}
-	#
-	# This I use now
-	# I make Varnish cache time x, but I'll tell to user caching very shorter time, because they re-visit quote rarely, and
-	# I force them download fresh content
 	# This is default, and can or will be overdriven later.
 	if ( beresp.status == 200 || beresp.ttl > 0s) {
-                unset beresp.http.expires;
-		unset beresp.http.cache-control;
-
-                # Set the clients TTL on this object
-                set beresp.http.cache-control = "max-age=86400"; # 24h
+                unset beresp.http.Expires;
+		unset beresp.http.Cache-Control;
+		unset beresp.http.Pragma;
 
                 #Set how long Varnish will keep it
                 set beresp.ttl = 7d;
 
-                # I don't know why I'm doing this
+		# 24h for browsers, 7d for Varnish and beresp.ttl is kind of fallback, if s-maxage is missing
+		set beresp.http.Cache-Control = "public, max-age=86400, s-maxage=604800;";
+
+                # Helps to group requests in varnishlog
 		set beresp.http.X-Varnish = bereq.xid;
 	}	
+
+	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
+	if (bereq.url ~ "^/wp-admin" || bereq.url ~ "^/wp-login.php") {
+		unset beresp.http.Cache-Control; # is this really needed?
+		set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
+		set beresp.ttl = 0s;
+		return(deliver);
+	}
 
 	## Set hit-for-pass for two minutes if TTL is 0 and response headers
   	## allow for validation. 
 	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
 	# if verification is allowed and use user's or intermediate cache.
-	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
-		return(pass(120s));
-	}
+	# As is it will cache WordPress admin too? Commented until I'm sure this can be done
+	#if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+	#	return(pass(120s));
+	#}
 
         ## Cache some responses only short period
         # Can I do beresp.status == 302 || beresp.status == 307 ?
         if (beresp.status == 404) {
-                unset beresp.http.cache-control;
-		set beresp.http.cache-control = "max-age=300";
+                unset beresp.http.Cache-Control;
+		set beresp.http.Cache-Control = "public, max-age=300";
                 set beresp.ttl = 1h;
         }
 
@@ -842,48 +837,56 @@ sub vcl_backend_response {
 
 	## 301/410 are quite static, so let's change TTL
         if (beresp.status == 301 || beresp.status == 410) {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=86400"; # 24h
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
                 set beresp.ttl = 1y;
         }
 
 	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
         # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
-	
+
 	# This includes .css and .js too.
 	# I'll later finetune this by type and actual files
 	if (bereq.http.Content-Type ~ "^text/") {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
+		set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 30d;
 	}
 
 	# RSS and other feeds like podcast can be cached
         # Podcast services are checking feed way too often, and I'm quite lazy to publish,
         # so 24h delay is acceptable
         if (bereq.http.Content-Type ~ "^(application|text)/xml") {
-                unset beresp.http.Cache-Control;
-		unset beresp.http.set-cookie;
-                set beresp.ttl = 86400s;  # 24h
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 1d;
         }
 
-	# Images don't change
+	# Fonts don't change
         if (bereq.http.Content-Type ~ "^font/") {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=31536000"; # 1y
+                set beresp.ttl = 1y;
         }
 
         # Images don't change
         if (bereq.http.Content-Type ~ "^image/") {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 30d;
         }
 
 	# Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
         if (beresp.http.Content-Type ~ "^(video|audio)/") {
-	        unset beresp.http.Cache-Control;
+		unset beresp.http.Cache-Control;
 		unset beresp.http.set-cookie;
+		set beresp.http.Cache-Control = "public, max-age=7200"; # 2h for users too, do not eat theirs memory
                 set beresp.ttl = 2h; # longer TTL just eats RAM
                 set beresp.do_stream = true;
         }
@@ -891,38 +894,38 @@ sub vcl_backend_response {
 
 	# These can be really big and not so often requested. And if there is a rush, those can be fetched
         if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
-                unset beresp.http.Cache-Control;
+		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
-                set beresp.ttl = 12h;
+                set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
+                set beresp.ttl = 12h; # users may need longer than is requested from cache
                 set beresp.do_stream = true;
 	}
 
         ## Robots.txt is really static, but let's be on safe side
         # Against all claims bots check robots.txt almost never, so caching doesn't help much
         if (bereq.url ~ "/robots.txt") {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=604800";
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=604800";
                 set beresp.ttl = 30d;
         }
 
         ## ads.txt and sellers.json is really static to me, but let's be on safe side
         if (bereq.url ~ "^/(ads.txt|sellers.json)") {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=604800";
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=604800";
                 set beresp.ttl = 30d;
         }
 
 	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
-        if (bereq.url ~ "sitemap") {
-                unset beresp.http.cache-control;
-                set beresp.ttl = 86400s;  # 24h
-        }
+	# At the moment I'm publishing a lot and fast, so this will stay commented now.
+#        if (bereq.url ~ "sitemap") {
+#                unset beresp.http.cache-control;
+#                set beresp.ttl = 86400s;  # 24h
+#        }
 
-        ## Tags this should be same than TTL of feeds. I don't have, if I remember right.
+        ## Tags this should be same than TTL of feeds. Let's use defaults, though.
         if (bereq.url ~ "tag") {
 		unset beresp.http.set-cookie;
-	        unset beresp.http.cache-control;
-                set beresp.ttl = 24h;
         }
 
         ## Search results, mostly Wordpress if I'm guessing right
@@ -930,32 +933,19 @@ sub vcl_backend_response {
         # Caching or not doesn't matter because users don't search too often anyway
         if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
 		unset beresp.http.set-cookie;
-                unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=120";
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=120";
                 set beresp.ttl = 5m;
         }
 		
-	## I have an issue with one cache-control value from WordPress when speedtesting
-	if (bereq.url ~ "/icons.ttf\?pozjks") {
-		unset beresp.http.set-cookie;
-		set beresp.http.cache-control = "max-age=31536000";
-	}
-
-	## WordPress archive page of podcasts
-	#if (bereq.url ~ "/podcastit/") {
-	#	unset beresp.http.set-cookie;
-	#	unset beresp.http.cache-control;
-	#	set beresp.http.cache-control = "max-age=43200"; # 12h for client
-	#	set beresp.ttl = 2d;
-	#}
-		
 	## Some admin-ajax.php calls can be cached by Varnish
 	# Except... it is almost always POST or OPTIONS and those are uncacheable
-	if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
-		unset beresp.http.set-cookie;
-		set beresp.ttl = 1d;
-		set beresp.grace = 1d;
-	}
+	# This might be an issue, so is commented until I'm sure this can be done
+	#if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+	#	unset beresp.http.set-cookie;
+	#	set beresp.ttl = 1d;
+	#	set beresp.grace = 1d;
+	#}
 
 	##### <-- The end of setting TTLs
 
@@ -1016,11 +1006,6 @@ sub vcl_backend_response {
 
 	## Unset Accept-Language, if backend gave one. We still want to keep it outside cache.
 	unset beresp.http.Accept-Language;
-
-	## Unset the old pragma header
-	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
-	# AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
-	unset beresp.http.Pragma;
 
 	## We are at the end
 }
