@@ -323,6 +323,11 @@ sub vcl_recv {
 	## Send Surrogate-Capability headers to announce ESI support to backend
 	# I don't understand at all what this is doing
 	set req.http.Surrogate-Capability = "key=ESI/1.0";
+
+        ## Some devices, mainly from Apple, send urls ending /null
+        if (req.url ~ "/null$") {
+                set req.url = regsub(req.url, "/null", "/");
+        }
 	
 	## Who can do BAN, PURGE and REFRESH and how
 	# Remember to use capitals when doing, size matters...
@@ -387,6 +392,13 @@ sub vcl_recv {
 	#			set req.http.X-Country-Code = "fi";
 	#	}
 	#}
+
+        ## Page that Monit will ping
+        # Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
+        # 200 OK is same as pass
+#       if (req.url == "^/monit-zxcvb") {
+#               return(synth(200, "OK"));
+#       }
 	
 	## Only GET and HEAD are cacheable methods AFAIK
         # In-build rule too
@@ -432,56 +444,68 @@ sub vcl_recv {
 		unset req.http.cookie;
 	}
 
+        ## Implementing websocket support
+        if (req.http.Upgrade ~ "(?i)websocket") {
+                return(pipe);
+        }
+
+        ## Cache warmup
+        # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
+        # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
+        if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
+                return(pass);
+        }	
+
+	## Enable smart refreshing, aka. ctrl+F5 will flush that page
+        # Remember your header Cache-Control must be set something else than no-cache
+        # Otherwise everything will miss
+        if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
+                set req.hash_always_miss = true;
+        }
+
 	## Do not cache AJAX requests.
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
 		return(pass);
 	}
+
+        ## Don't cache wordpress related pages
+        if (req.url ~ "(signup|activate|mail|logout)") {
+                return(pass);
+        }
+
+        ## Must Use plugins I reckon
+        if (req.url ~ "/mu-.*") {
+                return(pass);
+        }
 
 	## Don't cache logged-in user, password reseting and posts behind password
         # Frontend of Wordpress
         if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
                 return(pass);
         }
-	
-	## Enable smart refreshing, aka. ctrl+F5 will flush that page
-	# Remember your header Cache-Control must be set something else than no-cache
-	# Otherwise everything will miss
-	if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
-		set req.hash_always_miss = true;
-	}
-	
-	## Page that Monit will ping
-	# Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
-	# 200 OK is same as pass
-#	if (req.url == "^/monit-zxcvb") {
-#		return(synth(200, "OK"));
-#	}
-	
+		
 	## Adsense incomings are lower when Varnish is on, trying to solve out this
 	# is it because of caching or CSP-rules?
 	if (req.url ~ "adsbygoogle") {
 		return(pass);
 	}
 
-	## Implementing websocket support
-	if (req.http.Upgrade ~ "(?i)websocket") {
-		return(pipe);
-	}
+        ## REST API 
+        # I don't want to fill RAM for benefits of bots.
+        
+        # Mastodon/ActivityPub
+        if (req.url ~ "^/wp-json/(activitypub|friends)/") {
+                return(pass);
+        }
+        
+        # WordPress
+        if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+                return(synth(403, "Unauthorized request"));
+        }
 
-	## Cache warmup
-	# wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer" -H --domains=example.com --show-progress www.example.com
-	# It saves a lot of directories, so think where you are before launching it... A protip: /tmp
-	if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
-		return(pass);
-	}
-	
-	## Cache all static files by Removing all Cookies for static files
-	# These haven't Content-type, I don't know it or there is another reason to keep this that way.
-	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-	if (req.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|xls|xlsx|xz|zip)(\?.*)?$") {
-		unset req.http.cookie;
-		return(hash);
-	}
+#       if (req.url ~ "^/wp-json/") {
+#               return(pass);
+#       }
 	
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
@@ -524,39 +548,15 @@ sub vcl_recv {
 		unset req.http.cookie;
 		return(hash);
 	}
-	
-	## Some devices, mainly from Apple, send urls ending /null
-	if (req.url ~ "/null$") {
-		set req.url = regsub(req.url, "/null", "/");
-	}
-	
-	## REST API 
-	# I don't want to fill RAM for benefits of bots.
-	
-	# Mastodon/ActivityPub
-	if (req.url ~ "^/wp-json/(activitypub|friends)/") {
-		return(pass);
-	} 
-	
-	# WordPress
-	if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
-		return(synth(403, "Unauthorized request"));
-	}
 
-#	if (req.url ~ "^/wp-json/") {
-#		return(pass);
-#	}
-
-	## Don't cache wordpress related pages
-	if (req.url ~ "(signup|activate|mail|logout)") {
-		return(pass);
-	}
-
-	## Must Use plugins I reckon
-	if (req.url ~ "/mu-.*") {
-		return(pass);
-	}
-
+       ## Cache all static files by Removing all Cookies for static files
+        # These haven't Content-type, I don't know it or there is another reason to keep this that way.
+        # Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
+        if (req.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|xls|xlsx|xz|zip)(\?.*)?$") {
+                unset req.http.cookie;
+                return(hash);
+        }
+	
 	## Hit everything else
 	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
 	# Again, 'tuote' is product in finnish
