@@ -403,9 +403,10 @@ sub vcl_recv {
 
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
         # This must be before passing wp-admin
-        if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-               return(hash);
-        }
+        # Not sure how smart move this is. Commented until I'm sure.
+	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+        #       return(hash);
+        #}
 
 	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
 	#  before cookie monster to work.
@@ -792,8 +793,8 @@ sub vcl_backend_response {
 	}	
 
 	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
-	if (bereq.url ~ "^/wp-admin" || bereq.url ~ "^/wp-login.php") {
-		unset beresp.http.Cache-Control; # is this really needed?
+	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+		unset beresp.http.Cache-Control;
 		set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
 		set beresp.ttl = 0s;
 		return(deliver);
