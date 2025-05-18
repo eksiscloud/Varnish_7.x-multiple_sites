@@ -797,7 +797,7 @@ sub vcl_backend_response {
 	}	
 
 	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
-	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || bereq.url ~ "/(login|lataus)" ||  bereq.url ~ "preview=true") {
 		unset beresp.http.Cache-Control;
 		set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
 		set beresp.ttl = 0s;
