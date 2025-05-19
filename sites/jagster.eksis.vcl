@@ -25,7 +25,7 @@ import purge;		# Soft/hard purge by Varnish 7.x
 # from geoip package, needs separate compiling per Varnish version
 import geoip2;		# Load the GeoIP2 by MaxMind
 
-# from apt install varnish modules but it needs same Varnish version that repo is delivering
+# from apt install varnish-modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
 #import accept;		# Fix Accept-Language
@@ -45,6 +45,12 @@ include "/etc/varnish/ext/probes.vcl";
 
 # Bots with purpose
 include "/etc/varnish/ext/nice-bot.vcl";
+
+# Manipulating some urls
+include "/etc/varnish/ext/manipulate.vcl";
+
+# Centralized way to handle TTLs
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -83,18 +89,21 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	#.probe = sondi;
+#	.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
+# Heads up! ACL must be in use, if uncommented.
  
 # This can do almost everything
 acl whitelist {
 	"localhost";
 	"127.0.0.1";
 	"157.180.74.208";
-	"85.76.80.163";
+	"37.27.18.60";
+	"37.27.188.104";
+	"85.76.112.42";
 }
 
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
@@ -127,19 +136,19 @@ sub vcl_init {
 
 
 ############### vcl_recv #################
-## We should have here only statments without return(...)
-## because such jumps to buildin.vcl passing everything in all.common.vcl and hosts' vcl
+## We should have here only statments without return(...) or is must be unconditionally and stop process
 ## The solution has explained here: https://www.getpagespeed.com/server-setup/varnish/varnish-virtual-hosts
+## Here we are telling to Varnish what to do and what to cache or not. This is not for backend or i.e. browsers
 
 sub vcl_recv {
 	
 	set req.backend_hint = sites;
 
-	## just for this virtual host
+        ## just for this virtual host
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        #return(pipe);
+        #return(pipe);	
 
 	### The work starts here
 
@@ -157,21 +166,21 @@ sub vcl_recv {
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
 	# I'll ban or stop a country only after several tries, it is not a decision made easily 
-	# (well... it is actually, and Fail2ban will do that) 
+	# (well... it is actually)
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
-	# like from Turkey to Finland via Senegal
+	# like from Turkey to Finland via Senegal.
 	# For easier updating of the list ext/ban-countries.vcl
         call close_doors;
 
-        if (req.http.x-ban-country) {
-                std.log("banned country: " + std.toupper(req.http.x-ban-country));
-                return(synth(403, "Forbidden country: " + std.toupper(req.http.x-ban-country)));
-                unset req.http.x-ban-country;
-        }
-	
+	if (req.http.x-ban-country) {
+		std.log("banned country: " + std.toupper(req.http.x-ban-country));
+		return(synth(403, "Forbidden country: " + std.toupper(req.http.x-ban-country)));
+		unset req.http.x-ban-country;
+	}
+
 	# Quite often russians lie origin country, but are declaring russian as language
 	if (req.http.Accept-Language ~
-                "ru"
+                "(ru)"
 	) {
                 std.log("banned language: " + req.http.Accept-Language);
 		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
@@ -191,17 +200,17 @@ sub vcl_recv {
 	call asn_name;
 
 	## Redirecting http/80 to https/443
-        ## This could, and perhaps should, do on Nginx but certbot likes this better
+        # This could, and perhaps should, do in Nginx, but certbot likes this better
         if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
         (req.http.Scheme && req.http.Scheme != "https")) {
                 return(synth(750));
         }
 
 	## Reset hit/miss counter
-        unset req.http.x-cache;
+	unset req.http.x-cache;
 
 	## It will terminate badly formed requests
-        ## Build-in rule, that's why it is commented. But works only if there isn't return(...) that forces jump away
+        ## Build-in rule. But works only if there isn't return(...) that forces jump away
         if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
                 # In HTTP/1.1, Host is required.
                 return (synth(400));
@@ -214,7 +223,7 @@ sub vcl_recv {
 	#}
 	
 	## Let's clean up Proxy.
-	## It comes from dumb TSL-proxies like Hitch
+	# It comes from dumb TSL-proxies like Hitch
 	# This is old security measurement too
 	unset req.http.Proxy;
 
@@ -264,7 +273,7 @@ sub vcl_recv {
 	if (req.http.x-bot != "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
-		
+	
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
 	# There is big chance it is bot/scraper, but we have false identifications anyway. 
@@ -297,9 +306,9 @@ sub vcl_recv {
 	}
 		
 	## URL changes by ext/manipulate.vcl, mostly fixed search strings
-	#if (req.http.x-bot == "visitor") {
-	#	call new_direction;
-	#}
+	if (req.http.x-bot == "visitor") {
+		call new_direction;
+	}
 	
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
 	## so that backend doesn’t add CORS headers.
@@ -309,6 +318,11 @@ sub vcl_recv {
 	## Send Surrogate-Capability headers to announce ESI support to backend
 	# I don't understand at all what this is doing
 	set req.http.Surrogate-Capability = "key=ESI/1.0";
+
+        ## Some devices, mainly from Apple, send urls ending /null
+        if (req.url ~ "/null$") {
+                set req.url = regsub(req.url, "/null", "/");
+        }
 	
 	## Who can do BAN, PURGE and REFRESH and how
 	# Remember to use capitals when doing, size matters...
@@ -373,20 +387,41 @@ sub vcl_recv {
 	#			set req.http.X-Country-Code = "fi";
 	#	}
 	#}
+
+        ## Page that Monit will ping
+        # Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
+        # 200 OK is same as pass
+#       if (req.url == "^/monit-zxcvb") {
+#               return(synth(200, "OK"));
+#       }
 	
 	## Only GET and HEAD are cacheable methods AFAIK
-        # In-build rule, doesn't needed here
+        # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
                 return(pass);
         }
 
-	## Auth requests shall be passed
-        # In-build rule. doesn't needed here.
+	## Auth requests shall be passed. 
+	# Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
+        # In-build rule.
         if (req.http.Authorization || req.http.Cookie) {
                 return(pass);
         }
 
-	## Fix Wordpress visual editor and login issues, must be the first one as url requests to work (well, not exacly first...)
+	## .well-known should not be cached
+	if (req.url ~ "^/.well-known/") {
+		return(pass);
+	}
+
+	## admin-ajax can be a little bit faster, sometimes, but only if GET
+        # This must be before passing wp-admin
+        # Not sure how smart move this is. Commented until I'm sure.
+	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
+        #       return(hash);
+        #}
+
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+	#  before cookie monster to work.
         # Backend of Wordpress
         if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
@@ -408,118 +443,138 @@ sub vcl_recv {
 	if (req.http.cookie == "") {
 		unset req.http.cookie;
 	}
-	
+
+        ## Implementing websocket support
+        if (req.http.Upgrade ~ "(?i)websocket") {
+                return(pipe);
+        }
+
+        ## Cache warmup
+        # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
+        # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
+        if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
+                return(pass);
+        }	
+
+	## Enable smart refreshing, aka. ctrl+F5 will flush that page
+        # Remember your header Cache-Control must be set something else than no-cache
+        # Otherwise everything will miss
+        if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
+                set req.hash_always_miss = true;
+        }
+
 	## Do not cache AJAX requests.
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
 		return(pass);
 	}
-	
-	## Enable smart refreshing, aka. ctrl+F5 will flush that page
-	# Remember your header Cache-Control must be set something else than no-cache
-	# Otherwise everything will miss
-	if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
-		set req.hash_always_miss = true;
-	}
-	
-	## Page that Monit will ping
-	# Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
-	# 200 OK is same as pass
-#	if (req.url == "^/monit-zxcvb") {
-#		return(synth(200, "OK"));
-#	}
-	
+
+        ## Don't cache wordpress related pages
+        if (req.url ~ "(signup|activate|mail|logout)") {
+                return(pass);
+        }
+
+        ## Must Use plugins I reckon
+        if (req.url ~ "/mu-.*") {
+                return(pass);
+        }
+
+	## Don't cache logged-in user, password reseting and posts behind password
+        # Frontend of Wordpress
+        if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
+                return(pass);
+        }
+		
 	## Adsense incomings are lower when Varnish is on, trying to solve out this
 	# is it because of caching or CSP-rules?
 	if (req.url ~ "adsbygoogle") {
 		return(pass);
 	}
 
-	## Implementing websocket support
-	if (req.http.Upgrade ~ "(?i)websocket") {
-		return(pipe);
-	}
-
-	## Cache warmup
-	# wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer" -H --domains=example.com --show-progress www.example.com
-	# It saves a lot of directories, so think where you are before launching it... A protip: /tmp
-	if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
-		return(pass);
-	}
-	
-	## Large static audio files will be cached and streamed. I don't host videos, so let them be.
-        # The job will be done at vcl_backend_response
-        # But is this really needed nowadays?
-        if (req.http.Content-Type ~ "audio/") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-	## Cache all static files by Removing all Cookies for static files
-	# Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-	if (req.url ~ "^[^?]*\.(7z|bmp|bz2|css|csv|doc|docx|eot|flac|flv|gz|ico|js|otf|pdf|ppt|pptx|rtf|svg|swf|tar|tbz|tgz|ttf|txt|txz|webm|woff|woff2|xls|xlsx|xml|xz|zip)(\?.*)?$") {
-		unset req.http.cookie;
-		return(hash);
-	}
-		
-	## admin-ajax can be a little bit faster, sometimes, but only if GET
-	# This must be before passing wp-admin
-	if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-		return(hash);
-	}
-	
-	# Some devices, mainly from Apple, send urls ending /null
-	if (req.url ~ "/null$") {
-		set req.url = regsub(req.url, "/null", "/");
-	}
-	
-	## Don't cache logged-in user, password reseting and posts behind password
-	# Frontend of Wordpress
-	if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
-		return(pass);
-	}
-	
-	## REST API 
+        ## REST API 
         # I don't want to fill RAM for benefits of bots.
         
         # Mastodon/ActivityPub
         if (req.url ~ "^/wp-json/(activitypub|friends)/") {
                 return(pass);
-        } 
+        }
         
         # WordPress
-        if ( !req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+        if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
                 return(synth(403, "Unauthorized request"));
         }
 
-#	if (req.url ~ "^/wp-json/") {
-#		return(pass);
-#	}
+#       if (req.url ~ "^/wp-json/") {
+#               return(pass);
+#       }
+	
+	# Text-files are static, so cache it is.
+	# Cache these is equally stupid than caching images, though.
+	# This includes sitemaps, so consider smart TTL and remember: the order matters
+        if (req.http.Content-Type ~ "text/") {
+                unset req.http.cookie;
+                return(hash);
+        }
 
-	## Don't cache wordpress related pages
-	if (req.url ~ "(signup|activate|mail|logout)") {
-		return(pass);
+	# Fonts, another useless caching strategy
+        if (req.http.Content-Type ~ "font/") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
+	# Feeds should be cached, but on other side: only bots use them
+        if (req.http.Content-Type ~ "(application|text)/xml") {
+                unset req.http.cookie;
+                return(hash);
 	}
 
-	## Must Use plugins I reckon
-	if (req.url ~ "/mu-.*") {
-		return(pass);
+	# JavaScript are operating in user's device, so caching them is no issue. 
+	# But those don't create no load in backend, and need BAN after updates.
+	# Do you even know when Google Ads does updates?
+        if (req.http.Content-Type ~ "(text|application)/javascript") {
+                unset req.http.cookie;
+                return(hash);
+	}
+	
+	# Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
+        # The job will be done at vcl_backend_response
+        # But is this really needed nowadays?
+        if (req.http.Content-Type ~ "(audio|video)/") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
+	# Let's cache images, even it is a stupid move
+	if (req.http.Content-Type ~ "image/") {
+		unset req.http.cookie;
+		return(hash);
 	}
 
+       ## Cache all static files by Removing all Cookies for static files
+        # These haven't Content-type, I don't know it or there is another reason to keep this that way.
+        # Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
+        if (req.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|xls|xlsx|xz|zip)(\?.*)?$") {
+                unset req.http.cookie;
+                return(hash);
+        }
+	
 	## Hit everything else
-	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|checkout|addons|loggedout|lost-password)") {
+	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
+	# Again, 'tuote' is product in finnish
+	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
 		unset req.http.cookie;
 	}
 
 	## Normalize the query arguments.
+        # Perhaps wp-admin etc should be excluded?
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
-	# Every other VCL examples use this really early, but those are really old and 
+	# Every other VCL examples use this really early, but those are really aged tips and 
 	# I'm not so sure if those are actually ever tested in production.
 	set req.url = std.querysort(req.url);
 
 	## Let's clean User-Agent, just to be on safe side
-        # It will come back at vcl_hash, but without separate cache
-        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; I don't serve >
-        # and 404 from real users must fix right away
+        # It will come back at vcl_hash, but without separate caching
+        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; 
+	# I don't serve bots  and 404 from real users must fix right away
         set req.http.x-agent = req.http.User-Agent;
         if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
         unset req.http.User-Agent;
@@ -529,8 +584,9 @@ sub vcl_recv {
 	set req.http.x-language = req.http.Accept-Language;
 	unset req.http.Accept-Language;
 
-	## Everything else goes into cache
-	return(hash);
+	## Cache all others requests if they reach this point.
+	# Except this may break in-build logic. Commented until I'm sure this can be done.
+	#return(hash);
 
 # End of this one	
 } 
@@ -541,7 +597,7 @@ sub vcl_recv {
 sub vcl_pipe {
 
 	## Pipe counter
-        set req.http.x-cache = "pipe uncacheable";
+	set req.http.x-cache = "pipe uncacheable";
 
 	## Implementing websocket support
 	if (req.http.upgrade) {
@@ -558,7 +614,7 @@ sub vcl_pipe {
 sub vcl_pass {
 
 	## Pass counter
-        set req.http.x-cache = "pass";
+	set req.http.x-cache = "pass";
 
 }
 
@@ -571,14 +627,15 @@ sub vcl_hash {
 	# Because I don't have multilingual, everything goes under "fi"
 	#hash_data(req.http.Accept-Language);
 
-	## Return of User-Agent, but without caching
+	## Return of User-Agent and Accept-Language, but without caching
+	
 	# Now I can send User-Agent to backend for 404 logging etc.
 	# Vary must be cleaned of course
 	if (req.http.x-agent) {
 		set req.http.User-Agent = req.http.x-agent;
 		unset req.http.x-agent;
 	}
-
+	
 	# Same thing with Accept-Language
 	if (req.http.x-language) {
 		set req.http.Accept-Language = req.http.x-language;
@@ -599,10 +656,10 @@ sub vcl_hash {
 sub vcl_hit {
 
 	## Hit counter, grace
-        set req.http.x-cache = "hit";
-        if (obj.ttl <= 0s && obj.grace > 0s) {
-                set req.http.x-cache = "hit graced";
-        }
+	set req.http.x-cache = "hit";
+	if (obj.ttl <= 0s && obj.grace > 0s) {
+		set req.http.x-cache = "hit graced";
+	}
 
 	if (req.method == "PURGE") {
 		
@@ -639,7 +696,7 @@ sub vcl_hit {
 sub vcl_miss {
 
 	## Miss counter
-        set req.http.x-cache = "miss";
+	set req.http.x-cache = "miss";
 
 	## ESI
 	# I don't know how to handle ESI or do I need it at all
@@ -681,7 +738,8 @@ sub vcl_miss {
 
 ###################vcl_backend_response#############
 # This will alter everything what a backend responses back to Varnish
-#
+# Affets to what i.e. browsers will do
+
 sub vcl_backend_response {
 
 	## Add name of backend in varnishncsa log
@@ -714,54 +772,48 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	###  How long Varnish will keep objects aka. TTL -->
+	####  How long Varnish will keep objects aka. TTL -->
 
-	## Ordinary default; how long Varnish will keep objects
+		## Ordinary default; how long Varnish will keep objects
         # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
-        #
-	# Server must reboot about once in month so let's use it
-        # Backend may want something different, but we don't care
-        # Heads up! What should I do with nonce by Wordpress? That can't be cached over 12 hours says all docs.
-        #
-	# This I used earlier
-	#if (beresp.http.cache-control !~ "s-maxage") {
-	#	set beresp.ttl = 30d;
-	#} else {
-		# or if you will pass TTL to other intermediate caches as CDN, otherwise they will use maxage
-	#	set beresp.http.cache-control = "s-maxage=31536000, " + beresp.http.cache-control;
-	#}
-	#
-	# This I use now
-	# I make Varnish cache time x, but I'll tell to user caching very shorter time, because they re-visit quote rarely, and
-	# I force them download fresh content
 	# This is default, and can or will be overdriven later.
 	if ( beresp.status == 200 || beresp.ttl > 0s) {
-                unset beresp.http.expires;
-		unset beresp.http.cache-control;
-
-                # Set the clients TTL on this object
-                set beresp.http.cache-control = "max-age=86400"; # 24h
+                unset beresp.http.Expires;
+		unset beresp.http.Cache-Control;
+		unset beresp.http.Pragma;
 
                 #Set how long Varnish will keep it
                 set beresp.ttl = 7d;
 
-                # I don't know why I'm doing this
+		# 24h for browsers, 7d for Varnish and beresp.ttl is kind of fallback, if s-maxage is missing
+		set beresp.http.Cache-Control = "public, max-age=86400, s-maxage=604800;";
+
+                # Helps to group requests in varnishlog
 		set beresp.http.X-Varnish = bereq.xid;
 	}	
+
+	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
+	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || bereq.url ~ "/(login|lataus)" || bereq.url ~ "preview=true") {
+		unset beresp.http.Cache-Control;
+		set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
+		set beresp.ttl = 0s;
+		return(deliver);
+	}
 
 	## Set hit-for-pass for two minutes if TTL is 0 and response headers
   	## allow for validation. 
 	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
 	# if verification is allowed and use user's or intermediate cache.
-	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
-		return(pass(120s));
-	}
+	# As is it will cache WordPress admin too? Commented until I'm sure this can be done
+	#if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+	#	return(pass(120s));
+	#}
 
         ## Cache some responses only short period
         # Can I do beresp.status == 302 || beresp.status == 307 ?
         if (beresp.status == 404) {
-                unset beresp.http.cache-control;
-		set beresp.http.cache-control = "max-age=300";
+                unset beresp.http.Cache-Control;
+		set beresp.http.Cache-Control = "public, max-age=300";
                 set beresp.ttl = 1h;
         }
 
@@ -781,136 +833,126 @@ sub vcl_backend_response {
 
 	## 301/410 are quite static, so let's change TTL
         if (beresp.status == 301 || beresp.status == 410) {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=86400"; # 24h
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
                 set beresp.ttl = 1y;
         }
-
-	## Give relative short TTL to private ones
-        # Is there any point for this? Quite many plugins set private and that's why I clean cache-control later.
-#       if (beresp.http.cache-control ~ "private") {
-#                set beresp.uncacheable = true;
-#               set beresp.ttl = 7200s; # 2h
-#       }
 
 	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
         # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
 
-        # .css and .js are relatively long lasting; this can be an issue after updating, though
-        if (bereq.http.Content-Type ~ "^text/(css|javascript)") {
-		# This I did earlier...
-	#        if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-        #                unset beresp.http.Cache-Control;
-        #                unset beresp.http.set-cookie;
-        #        }
-        #        set beresp.ttl = 1y;
-		# ...but because I set up cache-control in the beginning, all I do now is cleaning cookies
-		unset beresp.http.set-cookie;
-        }
-
-        # These can be really big and not so often requested. And if there is a rush, those can be fetched
-        if (bereq.url ~ "^[^?]*\.(7z|bz2|csv|doc|docx|eot|gz|otf|pdf|ppt|pptx|rtf|tar|tbz|tgz|ttf|txt|txz|xls|xlsx)") {
+	# This includes .css and .js too.
+	# I'll later finetune this by type and actual files
+	if (bereq.http.Content-Type ~ "^text/") {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
-                set beresp.ttl = 12h;
-                set beresp.do_stream = true;
+		set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 30d;
+	}
+
+	# RSS and other feeds like podcast can be cached
+        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
+        # so 24h delay is acceptable
+        if (bereq.http.Content-Type ~ "^(application|text)/xml") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 1d;
+        }
+
+	# Fonts don't change
+        if (bereq.http.Content-Type ~ "^font/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=31536000"; # 1y
+                set beresp.ttl = 1y;
         }
 
         # Images don't change
-        if (bereq.http.Content-Type ~ "^(image)/") {
-                # again, earlier this way...
-		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-                        unset beresp.http.Cache-Control;
-                        unset beresp.http.set-cookie;
-                #}
-                #set beresp.ttl = 600s;
+        if (bereq.http.Content-Type ~ "^image/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+                set beresp.ttl = 30d;
         }
 
-	## Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
+	# Large static files are delivered directly to the end-user without waiting for Varnish to fully read t>
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
-        if (bereq.http.Content-Type ~ "^(video|audio)/") {
-		# I'm cleaning unnecessary if
-                #if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-                        unset beresp.http.Cache-Control;
-                #}
-                set beresp.ttl = 2h; # longer TTL just eats RAM
+        if (beresp.http.Content-Type ~ "^(video|audio)/") {
+		unset beresp.http.Cache-Control;
 		unset beresp.http.set-cookie;
+		set beresp.http.Cache-Control = "public, max-age=7200"; # 2h for users too, do not eat theirs memory
+                set beresp.ttl = 2h; # longer TTL just eats RAM
                 set beresp.do_stream = true;
         }
 
-	## RSS and other feeds like podcast can be cached
-        # Podcast services are checking feed way too often, and I'm quite lazy to publish,
-	# so 24h delay is acceptable
-        if (bereq.http.Content-Type ~ "text/xml") {
-		#if (beresp.http.Cache-Control ~ "(?i:no-cache|no-store|private)") {
-			unset beresp.http.Cache-Control;
-		#}
-		#set beresp.http.cache-control = "max-age=86400"; # 24h
-                set beresp.ttl = 86400s;
-        }
+
+	# These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
+                set beresp.ttl = 12h; # users may need longer than is requested from cache
+                set beresp.do_stream = true;
+	}
+
+	## WordPress archive page of podcasts
+	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.set-cookie;
+		unset beresp.http.cache-control;
+		set beresp.http.cache-control = "public, max-age=43200"; # 12h for client
+		set beresp.ttl = 2d;
+	}
 
         ## Robots.txt is really static, but let's be on safe side
         # Against all claims bots check robots.txt almost never, so caching doesn't help much
         if (bereq.url ~ "/robots.txt") {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=604800";
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=604800";
                 set beresp.ttl = 30d;
         }
 
         ## ads.txt and sellers.json is really static to me, but let's be on safe side
         if (bereq.url ~ "^/(ads.txt|sellers.json)") {
-                unset beresp.http.cache-control;
-                set beresp.http.cache-control = "max-age=604800";
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=604800";
                 set beresp.ttl = 30d;
         }
 
 	## Sitemaps should be rally'ish dynamic, but are those? But this is for bots only.
-        if (bereq.url ~ "sitemap") {
-                unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=120";
-                set beresp.ttl = 1h;
-        }
+	# At the moment I'm publishing a lot and fast, so this will stay commented now.
+#        if (bereq.url ~ "sitemap") {
+#                unset beresp.http.cache-control;
+#                set beresp.ttl = 86400s;  # 24h
+#        }
 
-        ## Tags this should be same than TTL of feeds. I don't have.
-        if (bereq.url ~ "(avainsana|tag)") {
-                unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=86400"; # 24h
-                set beresp.ttl = 24h;
+        ## Tags this should be same than TTL of feeds. Let's use defaults, though.
+        if (bereq.url ~ "tag") {
+		unset beresp.http.set-cookie;
         }
 
         ## Search results, mostly Wordpress if I'm guessing right
         # Normally those querys should pass but I want to cache answers shortly
         # Caching or not doesn't matter because users don't search too often anyway
         if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
-                unset beresp.http.cache-control;
-                #set beresp.http.cache-control = "max-age=120";
+		unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=120";
                 set beresp.ttl = 5m;
         }
 		
-	## I have an issue with one cache-control value from WordPress when speedtesting
-	if (bereq.url ~ "/icons.ttf\?pozjks") {
-		unset beresp.http.set-cookie;
-		set beresp.http.cache-control = "max-age=31536000";
-	}
-
-	## WordPress archive page of podcasts
-	if (bereq.url ~ "/podcastit/") {
-		unset beresp.http.cache-control;
-		set beresp.http.cache-control = "max-age=43200"; # 12h for client
-		set beresp.ttl = 2d;
-	}
-		
 	## Some admin-ajax.php calls can be cached by Varnish
 	# Except... it is almost always POST or OPTIONS and those are uncacheable
-	if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
-		unset beresp.http.set-cookie;
-		set beresp.ttl = 1d;
-		set beresp.grace = 1d;
-	}
+	# This might be an issue, so is commented until I'm sure this can be done
+	#if (bereq.url ~ "admin-ajax.php" && bereq.http.cookie !~ "wordpress_logged_in" ) {
+	#	unset beresp.http.set-cookie;
+	#	set beresp.ttl = 1d;
+	#	set beresp.grace = 1d;
+	#}
 
 	##### <-- The end of setting TTLs
-	
+
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
         unset beresp.http.Vary;
@@ -939,7 +981,7 @@ sub vcl_backend_response {
 	#	set beresp.do_gzip = true;
 	#}
 	
-	## Unset cookies except for Wordpress admin and pages
+	## Unset cookies except for Wordpress pages 
 	# Heads up: some sites may need to set cookie!
 	if (
 		bereq.url !~ "(wp-(login|admin)|login|admin-ajax|my-account|addons|logout|resetpass|lost-password)" &&
@@ -951,7 +993,7 @@ sub vcl_backend_response {
 	}
 	
 	## Do I really have to tell this again?
-	# In-build, not needed. On other hand, it sends uncacheable right away to backend.
+	# In-build, not needed. On other hand, it sends uncacheable right away to user.
 	if (bereq.method == "POST") {
 		set beresp.uncacheable = true;
 		return(deliver);
@@ -971,7 +1013,7 @@ sub vcl_backend_response {
 
 	## Unset the old pragma header
 	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
-	# AFAIK WordPress doensn't Pragma, so this is unnecessary here.
+	# AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
 	unset beresp.http.Pragma;
 
 	## We are at the end
@@ -1012,12 +1054,12 @@ sub vcl_deliver {
 
 	# HIT & MISS
 	if (obj.uncacheable) {
-                set req.http.x-cache = req.http.x-cache + " uncacheable" ;
-        } else {
-                set req.http.x-cache = req.http.x-cache + " cached" ;
-        } 
-        # uncomment the following line to show the information in the response
-        set resp.http.x-cache = req.http.x-cache;
+		set req.http.x-cache = req.http.x-cache + " uncacheable" ;
+	} else {
+		set req.http.x-cache = req.http.x-cache + " cached" ;
+	}
+	# uncomment the following line to show the information in the response
+	set resp.http.x-cache = req.http.x-cache;
 
 	if (obj.hits > 0) {
 		# I don't fancy boring hit/miss announcements
@@ -1102,9 +1144,9 @@ sub vcl_purge {
 sub vcl_synth {
 
 	## Synth counter
-        set req.http.x-cache = "synth synth";
-        # uncomment the following line to show the information in the response
-        # set resp.http.x-cache = req.http.x-cache;
+	set req.http.x-cache = "synth synth";
+	# uncomment the following line to show the information in the response
+	# set resp.http.x-cache = req.http.x-cache;
 
 	call cors;
 	
