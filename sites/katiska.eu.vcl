@@ -400,38 +400,6 @@ sub vcl_recv {
 #               return(synth(200, "OK"));
 #       }
 	
-	## Only GET and HEAD are cacheable methods AFAIK
-        # In-build rule too
-        if (req.method != "GET" && req.method != "HEAD") {
-                return(pass);
-        }
-
-	## Auth requests shall be passed. 
-	# Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
-        # In-build rule.
-        if (req.http.Authorization || req.http.Cookie) {
-                return(pass);
-        }
-
-	## .well-known should not be cached
-	if (req.url ~ "^/.well-known/") {
-		return(pass);
-	}
-
-	## admin-ajax can be a little bit faster, sometimes, but only if GET
-        # This must be before passing wp-admin
-        # Not sure how smart move this is. Commented until I'm sure.
-	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-        #       return(hash);
-        #}
-
-	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
-	#  before cookie monster to work.
-        # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-                return(pass);
-        }
-
 	## Keeping needed cookies and deleting rest.
 	# You don't need to hash with every cookie. You can do something like this too:
 	# sub vcl_hash {
@@ -452,6 +420,31 @@ sub vcl_recv {
         ## Implementing websocket support
         if (req.http.Upgrade ~ "(?i)websocket") {
                 return(pipe);
+        }
+
+	## Only GET and HEAD are cacheable methods AFAIK
+        # In-build rule too
+        if (req.method != "GET" && req.method != "HEAD") {
+                return(pass);
+        }
+
+        ## Auth requests shall be passed. 
+        # Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
+        # In-build rule.
+        if (req.http.Authorization || req.http.Cookie) {
+                return(pass);
+        }
+
+	## .well-known should not be cached
+        if (req.url ~ "^/.well-known/") {
+                return(pass);
+        }
+
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+        #  before cookie monster to work.
+        # Backend of Wordpress
+        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+                return(pass);
         }
 
         ## Cache warmup
@@ -511,7 +504,7 @@ sub vcl_recv {
 #       if (req.url ~ "^/wp-json/") {
 #               return(pass);
 #       }
-	
+
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
