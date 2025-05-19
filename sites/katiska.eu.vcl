@@ -413,6 +413,11 @@ sub vcl_recv {
                 return(pass);
         }
 
+	## .well-known should not be cached
+	if (req.url ~ "^/.well-known/") {
+		return(pass);
+	}
+
 	## admin-ajax can be a little bit faster, sometimes, but only if GET
         # This must be before passing wp-admin
         # Not sure how smart move this is. Commented until I'm sure.
