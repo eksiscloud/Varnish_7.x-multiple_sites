@@ -1,4 +1,6 @@
-# files 
+content-type
+content-type.save
+default.vcl.orig 
 secret
 default.vcl.save
 sites/*.save
