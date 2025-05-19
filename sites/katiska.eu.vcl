@@ -399,6 +399,13 @@ sub vcl_recv {
 #       if (req.url == "^/monit-zxcvb") {
 #               return(synth(200, "OK"));
 #       }
+
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+        #  before cookie monster to work.
+        # Backend of Wordpress
+        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+                return(pass);
+        }
 	
 	## Keeping needed cookies and deleting rest.
 	# You don't need to hash with every cookie. You can do something like this too:
@@ -437,13 +444,6 @@ sub vcl_recv {
 
 	## .well-known should not be cached
         if (req.url ~ "^/.well-known/") {
-                return(pass);
-        }
-
-	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
-        #  before cookie monster to work.
-        # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
                 return(pass);
         }
 
