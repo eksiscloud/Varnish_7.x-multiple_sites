@@ -399,29 +399,31 @@ sub vcl_recv {
 #       if (req.url == "^/monit-zxcvb") {
 #               return(synth(200, "OK"));
 #       }
-
+	
 	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
         #  before cookie monster to work.
         # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
-                return(pass);
-        }
-	
-	## Keeping needed cookies and deleting rest.
-	# You don't need to hash with every cookie. You can do something like this too:
-	# sub vcl_hash {
-	#	hash_data(cookie.get("language"));
-	# }
-	cookie.parse(req.http.cookie);
-	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
-	# But why _pk_ cookies passes?
-	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
-	set req.http.cookie = cookie.get_string();
+	if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
+		return (pass);
+	}
 
-	# Don' let empty cookies travel any further
-	if (req.http.cookie == "") {
-		unset req.http.cookie;
+	## Keeping needed cookies and deleting rest.
+	if (req.http.cookie) {
+		cookie.parse(req.http.cookie);
+
+		# Remove analytics and follower cookies
+		cookie.delete("__utm, _ga, _gid, _gat, _gcl, _fbp, fr, _pk_");
+
+		# Keep necessary WordPress cookies
+		# Not needed, because I earlier gave return(pass) for backend
+		cookie.keep("wordpress_logged_in_,wp-settings,wp-settings-time,_wp_session,resetpass");
+
+		set req.http.cookie = cookie.get_string();
+
+		# Don' let empty cookies travel any further
+		if (req.http.cookie == "") {
+			unset req.http.cookie;
+		}
 	}
 
         ## Implementing websocket support
@@ -505,6 +507,11 @@ sub vcl_recv {
 #               return(pass);
 #       }
 
+	## Ajax-requests: only for visitors
+	if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
+		return (hash);
+	}
+
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
@@ -583,8 +590,8 @@ sub vcl_recv {
 	unset req.http.Accept-Language;
 
 	## Cache all others requests if they reach this point.
-	# Except this may break in-build logic. Commented until I'm sure this can be done.
-	#return(hash);
+	# Needed because of all return jumps.
+	return(hash);
 
 # End of this one	
 } 
