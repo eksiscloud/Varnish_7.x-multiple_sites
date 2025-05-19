@@ -55,30 +55,6 @@ include "/etc/varnish/ext/manipulate.vcl";
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
-## Probes are watching if backends are healthy
-## You can check if a backend is  healthy or sick:
-## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
-
-#probe sondi {
-    #.url = "/index.html";  # or you can use just an url
-	# you must have installed libwww-perl:
-#    .request =
-#      "HEAD / HTTP/1.1"
-#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-#      "Connection: close"
-#      "User-Agent: Varnish Health Probe";
-#	.timeout = 5s;
-#	.interval = 4s;
-#	.window = 5;
-#	.threshold = 3;
-#}
-
-# Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
-# Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
-# Back to auto: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed auto
-# Check status: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
-# Debug status: varnishadm -S /etc/varnish/secret -T localhost:6082 debug.health 
-
 ## Backend tells where a site can be found
 
 # WordPress
@@ -89,7 +65,6 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-#	.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
@@ -395,58 +370,53 @@ sub vcl_recv {
 #               return(synth(200, "OK"));
 #       }
 	
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+        #  before cookie monster to work.
+        # Backend of Wordpress
+	if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
+		return (pass);
+	}
+
+	## Keeping needed cookies and deleting rest.
+	if (req.http.cookie) {
+		cookie.parse(req.http.cookie);
+
+		# Remove analytics and follower cookies
+		cookie.delete("__utm, _ga, _gid, _gat, _gcl, _fbp, fr, _pk_");
+
+		# Keep necessary WordPress cookies
+		# Not needed, because I earlier gave return(pass) for backend
+		cookie.keep("wordpress_logged_in_,wp-settings,wp-settings-time,_wp_session,resetpass");
+
+		set req.http.cookie = cookie.get_string();
+
+		# Don' let empty cookies travel any further
+		if (req.http.cookie == "") {
+			unset req.http.cookie;
+		}
+	}
+
+        ## Implementing websocket support
+        if (req.http.Upgrade ~ "(?i)websocket") {
+                return(pipe);
+        }
+
 	## Only GET and HEAD are cacheable methods AFAIK
         # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
                 return(pass);
         }
 
-	## Auth requests shall be passed. 
-	# Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
+        ## Auth requests shall be passed. 
+        # Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
         # In-build rule.
         if (req.http.Authorization || req.http.Cookie) {
                 return(pass);
         }
 
 	## .well-known should not be cached
-	if (req.url ~ "^/.well-known/") {
-		return(pass);
-	}
-
-	## admin-ajax can be a little bit faster, sometimes, but only if GET
-        # This must be before passing wp-admin
-        # Not sure how smart move this is. Commented until I'm sure.
-	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-        #       return(hash);
-        #}
-
-	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
-	#  before cookie monster to work.
-        # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+        if (req.url ~ "^/.well-known/") {
                 return(pass);
-        }
-
-	## Keeping needed cookies and deleting rest.
-	# You don't need to hash with every cookie. You can do something like this too:
-	# sub vcl_hash {
-	#	hash_data(cookie.get("language"));
-	# }
-	cookie.parse(req.http.cookie);
-	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
-	# But why _pk_ cookies passes?
-	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
-	set req.http.cookie = cookie.get_string();
-
-	# Don' let empty cookies travel any further
-	if (req.http.cookie == "") {
-		unset req.http.cookie;
-	}
-
-        ## Implementing websocket support
-        if (req.http.Upgrade ~ "(?i)websocket") {
-                return(pipe);
         }
 
         ## Cache warmup
@@ -506,7 +476,12 @@ sub vcl_recv {
 #       if (req.url ~ "^/wp-json/") {
 #               return(pass);
 #       }
-	
+
+	## Ajax-requests: only for visitors
+	if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
+		return (hash);
+	}
+
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
@@ -585,8 +560,8 @@ sub vcl_recv {
 	unset req.http.Accept-Language;
 
 	## Cache all others requests if they reach this point.
-	# Except this may break in-build logic. Commented until I'm sure this can be done.
-	#return(hash);
+	# Needed because of all return jumps.
+	return(hash);
 
 # End of this one	
 } 

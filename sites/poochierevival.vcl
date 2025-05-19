@@ -55,30 +55,6 @@ include "/etc/varnish/ext/manipulate.vcl";
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
-## Probes are watching if backends are healthy
-## You can check if a backend is  healthy or sick:
-## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
-
-#probe sondi {
-    #.url = "/index.html";  # or you can use just an url
-	# you must have installed libwww-perl:
-#    .request =
-#      "HEAD / HTTP/1.1"
-#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-#      "Connection: close"
-#      "User-Agent: Varnish Health Probe";
-#	.timeout = 5s;
-#	.interval = 4s;
-#	.window = 5;
-#	.threshold = 3;
-#}
-
-# Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
-# Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
-# Back to auto: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed auto
-# Check status: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
-# Debug status: varnishadm -S /etc/varnish/secret -T localhost:6082 debug.health 
-
 ## Backend tells where a site can be found
 
 # WordPress
@@ -89,7 +65,6 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	#.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
@@ -144,11 +119,6 @@ sub vcl_recv {
 	
 	set req.backend_hint = sites;
 
-	## Normalize hostname to avoid double caching
-	# I like to keep triple-w
-	set req.http.host = regsub(req.http.host,
-	"^poochierevival\.eu$", "www.poochierevival.info");
-	
         ## just for this virtual host
         # for stop caching uncomment
         #return(pass);
@@ -323,6 +293,11 @@ sub vcl_recv {
 	## Send Surrogate-Capability headers to announce ESI support to backend
 	# I don't understand at all what this is doing
 	set req.http.Surrogate-Capability = "key=ESI/1.0";
+
+        ## Some devices, mainly from Apple, send urls ending /null
+        if (req.url ~ "/null$") {
+                set req.url = regsub(req.url, "/null", "/");
+        }
 	
 	## Who can do BAN, PURGE and REFRESH and how
 	# Remember to use capitals when doing, size matters...
@@ -387,59 +362,61 @@ sub vcl_recv {
 	#			set req.http.X-Country-Code = "fi";
 	#	}
 	#}
+
+        ## Page that Monit will ping
+        # Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
+        # 200 OK is same as pass
+#       if (req.url == "^/monit-zxcvb") {
+#               return(synth(200, "OK"));
+#       }
 	
+	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+        #  before cookie monster to work.
+        # Backend of Wordpress
+	if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
+		return (pass);
+	}
+
+	## Keeping needed cookies and deleting rest.
+	if (req.http.cookie) {
+		cookie.parse(req.http.cookie);
+
+		# Remove analytics and follower cookies
+		cookie.delete("__utm, _ga, _gid, _gat, _gcl, _fbp, fr, _pk_");
+
+		# Keep necessary WordPress cookies
+		# Not needed, because I earlier gave return(pass) for backend
+		cookie.keep("wordpress_logged_in_,wp-settings,wp-settings-time,_wp_session,resetpass");
+
+		set req.http.cookie = cookie.get_string();
+
+		# Don' let empty cookies travel any further
+		if (req.http.cookie == "") {
+			unset req.http.cookie;
+		}
+	}
+
+        ## Implementing websocket support
+        if (req.http.Upgrade ~ "(?i)websocket") {
+                return(pipe);
+        }
+
 	## Only GET and HEAD are cacheable methods AFAIK
         # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
                 return(pass);
         }
 
-	## Auth requests shall be passed. 
-	# Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
+        ## Auth requests shall be passed. 
+        # Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
         # In-build rule.
         if (req.http.Authorization || req.http.Cookie) {
                 return(pass);
         }
 
 	## .well-known should not be cached
-	if (req.url ~ "^/.well-known/") {
-		return(pass);
-	}
-
-	## admin-ajax can be a little bit faster, sometimes, but only if GET
-        # This must be before passing wp-admin
-        # Not sure how smart move this is. Commented until I'm sure.
-	#if (req.url ~ "admin-ajax.php" && req.http.cookie !~ "wordpress_logged_in" ) {
-        #       return(hash);
-        #}
-
-	## Fix Wordpress visual editor and login issues, must be the first url pass requests and
-	#  before cookie monster to work.
-        # Backend of Wordpress
-        if (req.url ~ "/wp-(login|admin|my-account|comments-post.php|cron)" || req.url ~ "/(login|lataus)" || req.url ~ "preview=true") {
+        if (req.url ~ "^/.well-known/") {
                 return(pass);
-        }
-
-	## Keeping needed cookies and deleting rest.
-	# You don't need to hash with every cookie. You can do something like this too:
-	# sub vcl_hash {
-	#	hash_data(cookie.get("language"));
-	# }
-	cookie.parse(req.http.cookie);
-	# I'm deleting test_cookie because 'wordpress_' acts like wildcard, I reckon
-	# But why _pk_ cookies passes?
-	cookie.delete("wordpress_test_Cookie,_pk_");
-	cookie.keep("wordpress_,wp-settings,_wp-session,wordpress_logged_in_,resetpass");
-	set req.http.cookie = cookie.get_string();
-
-	# Don' let empty cookies travel any further
-	if (req.http.cookie == "") {
-		unset req.http.cookie;
-	}
-
-        ## Implementing websocket support
-        if (req.http.Upgrade ~ "(?i)websocket") {
-                return(pipe);
         }
 
         ## Cache warmup
@@ -499,7 +476,12 @@ sub vcl_recv {
 #       if (req.url ~ "^/wp-json/") {
 #               return(pass);
 #       }
-	
+
+	## Ajax-requests: only for visitors
+	if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
+		return (hash);
+	}
+
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
@@ -551,7 +533,8 @@ sub vcl_recv {
         }
 	
 	## Hit everything else
-	# I'm dealing with Wordpress
+	# I'm dealing with both, Wordpress and Woocommerce, here even I have Woocommerce spesific vcl too.
+	# Again, 'tuote' is product in finnish
 	if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
 		unset req.http.cookie;
 	}
@@ -577,8 +560,8 @@ sub vcl_recv {
 	unset req.http.Accept-Language;
 
 	## Cache all others requests if they reach this point.
-	# Except this may break in-build logic. Commented until I'm sure this can be done.
-	#return(hash);
+	# Needed because of all return jumps.
+	return(hash);
 
 # End of this one	
 } 
@@ -764,9 +747,9 @@ sub vcl_backend_response {
 		set beresp.do_esi = true;
 	}
 
-	###  How long Varnish will keep objects aka. TTL -->
+	####  How long Varnish will keep objects aka. TTL -->
 
-	## Ordinary default; how long Varnish will keep objects
+		## Ordinary default; how long Varnish will keep objects
         # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
 	# This is default, and can or will be overdriven later.
 	if ( beresp.status == 200 || beresp.ttl > 0s) {
@@ -784,16 +767,8 @@ sub vcl_backend_response {
 		set beresp.http.X-Varnish = bereq.xid;
 	}	
 
-	## .well-known
-	if (bereq.url ~ "^/.well-known/") {
-		unset beresp.http.Cache-Control;
-                set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
-                set beresp.ttl = 0s;
-		return(deliver);
-	}
-
 	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
-	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || bereq.url ~ "/(login|lataus)" ||  bereq.url ~ "preview=true") {
+	if (bereq.url ~ "^/wp-(login|admin|my-account|comments-post.php|cron)" || bereq.url ~ "/(login|lataus)" || bereq.url ~ "preview=true") {
 		unset beresp.http.Cache-Control;
 		set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
 		set beresp.ttl = 0s;
@@ -895,6 +870,14 @@ sub vcl_backend_response {
                 set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
                 set beresp.ttl = 12h; # users may need longer than is requested from cache
                 set beresp.do_stream = true;
+	}
+
+	## WordPress archive page of podcasts
+	if (bereq.url ~ "/podcastit/") {
+		unset beresp.http.set-cookie;
+		unset beresp.http.cache-control;
+		set beresp.http.cache-control = "public, max-age=43200"; # 12h for client
+		set beresp.ttl = 2d;
 	}
 
         ## Robots.txt is really static, but let's be on safe side
@@ -1002,6 +985,11 @@ sub vcl_backend_response {
 
 	## Unset Accept-Language, if backend gave one. We still want to keep it outside cache.
 	unset beresp.http.Accept-Language;
+
+	## Unset the old pragma header
+	# Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
+	# AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
+	unset beresp.http.Pragma;
 
 	## We are at the end
 }
