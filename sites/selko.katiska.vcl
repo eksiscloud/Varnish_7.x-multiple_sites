@@ -89,7 +89,7 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	.probe = sondi;
+#	.probe = sondi;
 }
 
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
