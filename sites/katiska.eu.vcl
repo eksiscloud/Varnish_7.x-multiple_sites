@@ -404,10 +404,21 @@ sub vcl_recv {
         #  before cookie monster to work.
         # Backend of Wordpress
 	if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
-		return (pass);
+		return(pass);
 	}
 
-	## Keeping needed cookies and deleting rest.
+	## Don't cache logged-in user, password reseting and posts behind password
+	# Could be after cookie monster, but let be is safe side bedfore cookies are messed
+	if (req.http.Cookie ~ "wordpress_logged_in_" || req.http.Cookie ~ "wp-postpass_" || req.http.Cookie ~ "resetpass") {
+		return(pass);
+	}
+
+	## Don't cache auth, i.e. if REST API needs it.
+	if (req.http.Authorization) {
+		return(pass);
+	}
+
+	## Cookie monster: Keeping needed cookies and deleting rest.
 	if (req.http.cookie) {
 		cookie.parse(req.http.cookie);
 
@@ -434,13 +445,6 @@ sub vcl_recv {
 	## Only GET and HEAD are cacheable methods AFAIK
         # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
-                return(pass);
-        }
-
-        ## Auth requests shall be passed. 
-        # Must be before cookie monster, unless Wordpress frontend doesn' know logged in user
-        # In-build rule.
-        if (req.http.Authorization || req.http.Cookie) {
                 return(pass);
         }
 
@@ -475,12 +479,6 @@ sub vcl_recv {
 
         ## Must Use plugins I reckon
         if (req.url ~ "/mu-.*") {
-                return(pass);
-        }
-
-	## Don't cache logged-in user, password reseting and posts behind password
-        # Frontend of Wordpress
-        if (req.http.cookie ~ "(wordpress_logged_in|resetpass|postpass)") {
                 return(pass);
         }
 		
