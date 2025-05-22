@@ -95,13 +95,7 @@ sub errorit {
 			</body>
 		</html>
 		"} );
-		unset req.http.connection;
-		return (deliver);
-	}
-
-	## Nginx style error 444
-	if (resp.status == 444) {
-		return(abandon);
+		return(deliver);
 	}
 		
 	## System is down
@@ -142,29 +136,25 @@ sub errorit {
 
 	## Custom error for banning
 	if (resp.status == 666) {
-		# ngix style treatment
-		return(abandon);
-
-		# actual error, if wanted
-		#set resp.status = 666;
-		#set resp.http.Content-Type = "text/html; charset=utf-8";
-		#set resp.http.Retry-After = "5";
-		#synthetic( {"<!DOCTYPE html>
-		#<html>
-		#	<head>
-		#		<title>Error "} + resp.status + " " + resp.reason + {"</title>
-		#	</head>
-		#	<body>
-		#		<h1>Error "} + resp.status + " " + resp.reason + {"</h1>
-		#		<p>"} + resp.reason + " from IP " + std.ip(req.http.X-Real-IP, "0.0.0.0") + {"</p>
-		#		<h3>Guru Meditation:</h3>
-		#		<p>XID: "} + req.xid + {"</p>
-		#		<hr>
-		#		<p>Varnish cache server</p>
-		#	</body>
-		#</html>
-		#"} );
-		#return (deliver);
+		set resp.status = 666;
+		set resp.http.Content-Type = "text/html; charset=utf-8";
+		set resp.http.Retry-After = "5";
+		synthetic( {"<!DOCTYPE html>
+		<html>
+			<head>
+				<title>Error "} + resp.status + " " + resp.reason + {"</title>
+			</head>
+			<body>
+				<h1>Error "} + resp.status + " " + resp.reason + {"</h1>
+				<p>"} + resp.reason + " from IP " + std.ip(req.http.X-Real-IP, "0.0.0.0") + {"</p>
+				<h3>Guru Meditation:</h3>
+				<p>XID: "} + req.xid + {"</p>
+				<hr>
+				<p>Varnish cache server</p>
+			</body>
+		</html>
+		"} );
+		return (deliver);
 	}
 
 	## 301/302 redirects using custom status
