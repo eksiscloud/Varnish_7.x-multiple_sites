@@ -68,10 +68,23 @@ sub wp {
 #               return(pass);
 #       }
 
-	## Ajax-requests: only for visitors
-	if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
-		return (hash);
+	## Normalize the query arguments.
+        # I'm excluding admin, because otherwise it will cause issues.
+        # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
+        # Every other VCL examples use this really early, but those are really aged tips and 
+        # I'm not so sure if those are actually ever tested in production.
+	# Done after all passes and before the first hash.
+	if (req.url !~ "^/wp-(admin|login)" && req.url !~ "/logout") {
+		set req.url = std.querysort(req.url);
 	}
+
+	## Ajax-requests: only for visitors
+	# This is hazy. if there is nonce, it is personal and should not cache.
+	# Commented until I'm sure what to do. And do I have such ones in use at all?
+	# Basically everyone I found from logs were by me or bots. And I don't serve bots.
+	#if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
+	#	return(hash);
+	#}
 
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
