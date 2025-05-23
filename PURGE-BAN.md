@@ -1,37 +1,29 @@
-# BAN/PURGE
-Just a note how to BAN some objects from my sites.
-* BAN changes TTL to zero and forces requests to get fresh fish. There is `grace`, `hit-to-pass` or something in use, though.
-* PURGE destroys objects from the cache right away. There can be `soft PURGE` and `hard PURGE` too, and soft one is same as BAN, I suppose. Which one is in use depends of the configuration from VCL.
+# Soft PURGE
 
-BAN/PURGE can be made using two different methods:
-* from app or directly from a console using HTTPie, wget, curl etc.
-* using `varnishadm`; I recon BAN can be done this way, but PURGE must do using curl or similar ones
+PURGE actually does BAN
 
-I'm using `varnishadm` because it feels more simplier than `curl -X BAN "something"`. Plus my setup has some error and I can't PURGE using curl or HTTPie.
+## Current Architecture and Operation
 
-## Examples
+**PURGE and BAN Logic (vcl_recv)**
 
-* the frontpage, change req.url for everything else
-```
-varnishadm ban req.http.host == "www.katiska.eu" && req.url ~ ^/"
-```
+* All PURGE, BAN, and REFRESH requests are handled centrally in the vcl_recv section.
+* A request is accepted only if the X-Real-IP is on the whitelist (e.g., localhost or the VPS's IP).
+* Three types of PURGE functionality have been implemented:
 
-* do this to see what is banned and everything has gone thru and is completed
-```
-varnishadm ban.list
-```
+  * xkey-purge: if the xkey-purge header is included, a ban("obj.http.X-Cache-Tags ~ ...") is executed.
+  * File path-based ban: e.g., /wp-content/uploads/audio/ or /images/.
+  * Other PURGE requests are directed to normal hash processing (return(hash)), allowing Varnish to invalidate the exact given URL.
 
-### Paths for my use
+**vcl_hit / vcl_miss / vcl_purge**
 
-**Podcasts:**
-```
-/feed/podcast/katiska
-/feed/podcast/kaffepaussi
-```
+* Removed or commented out the old PURGE soft/hard logic that repeated purge.soft() or purge.hard() calls.
+* No longer a need for separate TTL variable settings or a restart mechanism.
 
-**WordPress:**
-```
-/wp-content/themes/
-/wp-content/plugins/
-```
+**xkey-purge Support**
 
+* Varnish executes a ban() command based on the HTTP header X-Cache-Tags.
+* This allows for selective cache purges, e.g., articles, sidebars, homepage, etc.
+
+**Support for curl and shell scripts**
+
+* Standardized PURGE interface (curl -X PURGE ...).
