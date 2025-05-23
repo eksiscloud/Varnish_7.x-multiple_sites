@@ -303,31 +303,6 @@ sub vcl_synth {
 		return(deliver);
 	}
 
-	## Custom error for banning
-	if (resp.status == 666) {
-		set resp.status = 666;
-		#synthetic(std.fileread("/etc/varnish/error/666.html"));
-		set resp.http.Content-Type = "text/html; charset=utf-8";
-		set resp.http.Retry-After = "5";
-		synthetic( {"<!DOCTYPE html>
-		<html>
-			<head>
-				<title>Error "} + resp.status + " " + resp.reason + {"</title>
-			</head>
-			<body>
-				<h1>Error "} + resp.status + " " + resp.reason + {"</h1>
-				<p>"} + resp.reason + " from IP " + std.ip(req.http.X-Real-IP, "0.0.0.0") + {"</p>
-				<h3>Guru Meditation:</h3>
-				<p>XID: "} + req.xid + {"</p>
-				<hr>
-				<p>Varnish cache server</p>
-			</body>
-		</html>
-		"} );
-		unset req.http.connection;
-		return (deliver);
-	}
-
 	## 301/302 redirects using custom status
 	if (resp.status == 701) {
 	# We use this special error status 720 to force redirects with 301 (permanent) redirects
