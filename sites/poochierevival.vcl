@@ -206,10 +206,19 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	### lookups don't work from subs.
+	## Give 127.0.0.1 to X-Real-IP if curl is used from localhost
+	# (std.ip(req.http.X-Real-IP, "0.0.0.0") goes to fallbck when curl is used from localhost and fails
+	# Because Nginx acts as a reverse oroxy, client.ip is always its IP.
+	# Now we get some IP when worked from home shell
+	if (!req.http.X-Real-IP || req.http.X-Real-IP == "") {
+		set req.http.X-Real-IP = client.ip;
+	}
 
-	## Must save user's IP.
-	# if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) doesn't work in sub vcls
+	## Forbidden means forbidden
+	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
+        if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+                return (synth(403, "Access Denied " + req.http.X-Real-IP));
+        }
 
 	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
@@ -276,6 +285,24 @@ sub vcl_recv {
 		call tech_things;
 	}
 
+	# Now we shall filtering techs by whitelisted IPs
+	# Must do up here, because std.ip(... ) apparenty doesn't work in sub vcls
+        if (req.http.x-bot == "tech") {
+                if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+                        return(synth(666, "Forbidden Bot " + req.http.X-Real-IP));
+                }
+        }
+
+	# KatiskaWarmer will warm up cache, so it has to look like a visitor
+        if (req.http.User-Agent == "KatiskaWarmer") {
+                if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
+                        set req.http.x-bot = "visitor";
+                        set req.http.x-user-agent = req.http.User-Agent;
+                } else {
+                        return(synth(666, "False Bot"));
+                }
+        }
+
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/nice-bot.vcl
 	if (req.http.x-bot != "(visitor|tech)") {
@@ -297,7 +324,12 @@ sub vcl_recv {
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	call oblivion;
+	if (req.method == "BAN" || req.method == "PURGE" || req.method == "REFRESH") {
+               if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+                       return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
+                }
+		call oblivion;
+	}
 	
 	## These must, should or could do before cookie monster
 	# includes/pre-wordpress.vcl
