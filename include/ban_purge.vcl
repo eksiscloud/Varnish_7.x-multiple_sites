@@ -5,33 +5,25 @@ sub oblivion {
                        return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
                 }
 		
-		# BAN needs a pattern:
-		# curl -X BAN -H "X-Ban-Request:^/contact" "www.example.com"
-		# varnishadm ban obj.http.Content-Type ~ ^image/
-		if (req.method == "BAN") {
-			if(!req.http.x-ban-request) {
-				return(synth(400,"Missing x-ban header"));
-			}
-			ban("req.url ~ " 
-			+ req.http.x-ban-request
-			+ " && req.http.host == " 
-			+ req.http.host);
-				# Throw a synthetic page so the request won't go to the backend
-				return (synth(200,"Ban added"));
-		}
-	
-		# soft/hard purge
+		## Soft PURGE
 		if (req.method == "PURGE") {
-			if (!req.http.xkey-purge) {
-				return (synth(400, "Missing xkey-purge header"));
+        
+			# Using  X-Cache-Tags header
+			if (req.http.xkey-purge) {
+				ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
+				return(synth(200, "Purged cache-tag: " + req.http.xkey-purge));
 			}
-			#if (!req.http.xkey-purge) {
-			#	return(hash);
-			#}
-			return(synth(200, "Purging with xkey"));
-		}
-		
-		# Hit-always-miss - Old content will be updated with fresh one.
+
+			# Example: audio/images using url
+			if (req.url ~ "^/wp-content/uploads/audio/" || req.url ~ "^/wp-content/uploads/images/") {
+				ban("obj.url ~ ^" + req.url);
+				return(synth(200, "Purged URL match: " + req.url));
+			}
+
+			# All other PURGEs
+			return(hash);
+
+		##  Hit-always-miss - Old content will be updated with fresh one.
 		if (req.method == "REFRESH") {
 			set req.method = "GET";
 			set req.hash_always_miss = true;
