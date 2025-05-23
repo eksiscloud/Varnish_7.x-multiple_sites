@@ -24,12 +24,6 @@ sub oblivion {
 			return(hash);
 		}
 
-		##  Hit-always-miss - Old content will be updated with fresh one.
-		if (req.method == "REFRESH") {
-			set req.method = "GET";
-			set req.hash_always_miss = true;
-		}
-	
 	# This just an example how to ban objects or purge all when country codes come from backend
 	#if (req.method == "PURGE") {
 	#	if (!std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
@@ -52,4 +46,3 @@ sub oblivion {
 	}
 
 }
-
