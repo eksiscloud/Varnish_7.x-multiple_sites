@@ -29,7 +29,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
 #import accept;		# Fix Accept-Language
-#import xkey;		# another way to ban
+import xkey;		# another way to ban
 
 ## includes are normally in vcl
 # Pure normalizing and similar, normally done first
@@ -68,7 +68,7 @@ include "/etc/varnish/include/hited.vcl";
 # vcl_purge
 include "/etc/varnish/include/purged.vcl";
 
-# vcl_backedn_response, part I
+# vcl_backend_response, part I
 include "/etc/varnish/include/be_start.vcl";
 
 # vcl_backend_response, part II - TTL
@@ -76,6 +76,9 @@ include "/etc/varnish/include/be_ttl.vcl";
 
 # vcl_backend_response, part III
 include "/etc/varnish/include/be_end.vcl";
+
+# vcl_backend_response, pat IV, xkey
+include "/etc/varnish/include/x-key.vcl";
 
 # vcl_deliver, part I
 include "/etc/varnish/include/delivered.vcl";
@@ -203,7 +206,19 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	### lookups don't work from subs.
+	## Give 127.0.0.1 to X-Real-IP if curl is used from localhost
+	# (std.ip(req.http.X-Real-IP, "0.0.0.0") goes to fallbck when curl is used from localhost and fails
+	# Because Nginx acts as a reverse oroxy, client.ip is always its IP.
+	# Now we get some IP when worked from home shell
+	if (!req.http.X-Real-IP || req.http.X-Real-IP == "") {
+		set req.http.X-Real-IP = client.ip;
+	}
+
+	## Forbidden means forbidden
+	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
+        if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+                return (synth(403, "Access Denied " + req.http.X-Real-IP));
+        }
 
 	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
@@ -398,6 +413,9 @@ sub vcl_backend_response {
 	## Third part
 	# include/be_end.vcl
 	call be_ended;
+
+	## Fourh part, xkey
+	call ban-tags;
 
 	## We are at the end
 }
