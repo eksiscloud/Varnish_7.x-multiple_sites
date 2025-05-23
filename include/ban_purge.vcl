@@ -22,6 +22,7 @@ sub oblivion {
 
 			# All other PURGEs
 			return(hash);
+		}
 
 		##  Hit-always-miss - Old content will be updated with fresh one.
 		if (req.method == "REFRESH") {
