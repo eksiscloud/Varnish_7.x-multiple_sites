@@ -1,6 +1,6 @@
 sub set_normalizing {
 
-	 ## Reset hit/miss counter
+	## Reset hit/miss counter
         unset req.http.x-cache;
 
         ## It will terminate badly formed requests
@@ -80,17 +80,12 @@ sub set_normalizing {
 
         ## Send Surrogate-Capability headers to announce ESI support to backend
         # I don't understand at all what this is doing
-        set req.http.Surrogate-Capability = "key=ESI/1.0";
+        #set req.http.Surrogate-Capability = "key=ESI/1.0";
 
         ## Some devices, mainly from Apple, send urls ending /null
         if (req.url ~ "/null$") {
                 set req.url = regsub(req.url, "/null", "/");
         }
-
-
-
-
-
 
 }
 

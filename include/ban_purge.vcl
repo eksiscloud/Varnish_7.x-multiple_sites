@@ -1,12 +1,9 @@
 sub oblivion {
 
-	## Who can do BAN, PURGE and REFRESH and how
-	# Remember to use capitals when doing, size matters...
-	
 	if (req.method == "BAN" || req.method == "PURGE" || req.method == "REFRESH") {
                if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
                        return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
-		}
+                }
 		
 		# BAN needs a pattern:
 		# curl -X BAN -H "X-Ban-Request:^/contact" "www.example.com"
@@ -39,7 +36,6 @@ sub oblivion {
 			set req.method = "GET";
 			set req.hash_always_miss = true;
 		}
-	}
 	
 	# This just an example how to ban objects or purge all when country codes come from backend
 	#if (req.method == "PURGE") {
@@ -60,7 +56,7 @@ sub oblivion {
 	#		if (req.http.X-Country-Code !~ "(fi|se)") {
 	#			set req.http.X-Country-Code = "fi";
 	#	}
-	#}
+	}
 
 }
 

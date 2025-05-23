@@ -285,24 +285,6 @@ sub vcl_recv {
 		call tech_things;
 	}
 
-	# Now we shall filtering techs by whitelisted IPs
-	# Must do up here, because std.ip(... ) apparenty doesn't work in sub vcls
-        if (req.http.x-bot == "tech") {
-                if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
-                        return(synth(666, "Forbidden Bot " + req.http.X-Real-IP));
-                }
-        }
-
-	# KatiskaWarmer will warm up cache, so it has to look like a visitor
-        if (req.http.User-Agent == "KatiskaWarmer") {
-                if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
-                        set req.http.x-bot = "visitor";
-                        set req.http.x-user-agent = req.http.User-Agent;
-                } else {
-                        return(synth(666, "False Bot"));
-                }
-        }
-
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/nice-bot.vcl
 	if (req.http.x-bot != "(visitor|tech)") {
@@ -324,12 +306,7 @@ sub vcl_recv {
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	if (req.method == "BAN" || req.method == "PURGE" || req.method == "REFRESH") {
-               if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
-                       return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
-                }
-		call oblivion;
-	}
+	call oblivion;
 	
 	## These must, should or could do before cookie monster
 	# includes/pre-wordpress.vcl

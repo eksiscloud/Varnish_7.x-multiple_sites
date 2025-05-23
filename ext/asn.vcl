@@ -1,5 +1,9 @@
 sub asn_name {
 
+if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+                return (synth(403, "Access Denied " + req.http.X-Real-IP));
+        }
+
 	## If you have just another website for real users maybe It is wise move to ban every single one VPS service
 	## you don't need for APIs etc.
 	# Heads up: ASN can and quite often will stop more than just one company
@@ -75,10 +79,5 @@ sub asn_name {
 			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
 		}
 		
-	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
-	if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
-		return (synth(403, "Access Denied " + req.http.X-Real-IP));
-	}
-
 # The end of the sub
 }
