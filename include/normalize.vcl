@@ -52,9 +52,7 @@ sub set_normalizing {
         req.method != "OPTIONS" &&
         req.method != "PATCH" &&
         req.method != "DELETE" &&
-        req.method != "PURGE" &&
-        req.method != "BAN" &&
-        req.method != "REFRESH"
+        req.method != "PURGE"
         ) {
         # Non-RFC2616 or CONNECT which is weird.
         # Why send the packet upstream, while the visitor is using a non-valid HTTP method?
