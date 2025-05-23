@@ -208,6 +208,9 @@ sub vcl_recv {
 
 	### lookups don't work from subs.
 
+	## Must save user's IP.
+	# if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) doesn't work in sub vcls
+
 	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard

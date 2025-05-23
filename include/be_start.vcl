@@ -30,11 +30,16 @@ sub be_started {
 		set beresp.uncacheable = true;
 	}
 	
+	## xkey for smarter PURGE
+	if (beresp.http.X-Cache-Tags) {
+		set beresp.http.xkey = beresp.http.X-Cache-Tags;
+	}
+
 	## ESI is enabled and now in use if needed
 	# except... I didn't configured this on MISS
-	if (beresp.http.Surrogate-Control ~ "ESI/1.0") {
-		unset beresp.http.Surrogate-Control;
-		set beresp.do_esi = true;
-	}
+	#if (beresp.http.Surrogate-Control ~ "ESI/1.0") {
+	#	unset beresp.http.Surrogate-Control;
+	#	set beresp.do_esi = true;
+	#}
 
 }

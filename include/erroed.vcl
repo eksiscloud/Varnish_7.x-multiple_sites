@@ -47,7 +47,6 @@ sub errorit {
 			</body>
 		</html>
 		"} );
-		unset req.http.connection;
 		return (deliver);
 	}
 	
@@ -211,6 +210,20 @@ sub errorit {
 			"} );
 			return(deliver);
 		}
+	}
+
+	## Purge by xkey
+	#if (req.http.xkey-purge) {
+	#	xkey.purge(req.http.xkey-purge);
+	#	set resp.http.Xkey-Purged = req.http.xkey-purge;
+	#	set resp.status = 200;
+	#	set resp.reason = "Purged by xkey";
+	#}
+
+	if (req.method == "PURGE" && resp.reason == "Purging with xkey") {
+		ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
+		set resp.http.Xkey-Purged = req.http.xkey-purge;
+		return (deliver);
 	}
 
 	## all other errors if any
