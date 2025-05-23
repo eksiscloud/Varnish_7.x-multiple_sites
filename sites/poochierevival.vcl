@@ -29,7 +29,7 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
 #import accept;		# Fix Accept-Language
-#import xkey;		# another way to ban
+import xkey;		# another way to ban
 
 ## includes are normally in vcl
 # Pure normalizing and similar, normally done first
@@ -68,7 +68,7 @@ include "/etc/varnish/include/hited.vcl";
 # vcl_purge
 include "/etc/varnish/include/purged.vcl";
 
-# vcl_backedn_response, part I
+# vcl_backend_response, part I
 include "/etc/varnish/include/be_start.vcl";
 
 # vcl_backend_response, part II - TTL
@@ -76,6 +76,9 @@ include "/etc/varnish/include/be_ttl.vcl";
 
 # vcl_backend_response, part III
 include "/etc/varnish/include/be_end.vcl";
+
+# vcl_backend_response, pat IV, xkey
+include "/etc/varnish/include/x-key.vcl";
 
 # vcl_deliver, part I
 include "/etc/varnish/include/delivered.vcl";
@@ -398,6 +401,9 @@ sub vcl_backend_response {
 	## Third part
 	# include/be_end.vcl
 	call be_ended;
+
+	## Fourh part, xkey
+	call ban-tags;
 
 	## We are at the end
 }
