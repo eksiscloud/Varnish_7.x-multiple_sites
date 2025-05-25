@@ -1,4 +1,4 @@
-# Varnish_7.x-multiple_sites
+# Varnish 7.x with multiple sites
 
 My dev-copy of stack Nginx+Varnish+Apache2 with several virtual hosts, bad-bot, unauth 403-urls, GeoIP etc.
 
@@ -20,7 +20,9 @@ The stack is:
 
 ## The setup of Varnish
 
-I've tried comment everything but all I've done are quite basic things and self explaining. It is not so optimized, and TTLs aren't planned, but chosen by feelings.
+I've tried comment everything but all I've done are quite basic things and self explaining. It is lightly optimized, and TTLs aren't planned, but chosen by feelings.
+
+The base idea behind TTLs are making compromisses between demand and use of RAM. In most of cases a new article gets attemtion max two days. At same time I'm using shorter TTLs with users and longer for Varnish. The idea behind that is to save space of theirs devices, because 90% of users have mobiles. They quite rarely visit again same resource after one week. Browsers are almot impossible to control, Safari is very famous of really aggressive caching, so I try to be sure that users get fresh content. Varnish on other hand can store objects more longer, because it can serve thwm really fast.
 
 ## Limitations
 
@@ -139,5 +141,5 @@ Because all of that happens in CLI your `varnishd` shuts down when you close CLI
 
 ## My opinion
 
-This is one solution when using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl with site vcls from here (that repo has some issues per se) could be the road with smallest bumps.
+This is one solution when using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. I must say that after quite short while load/labe route is better option, soecially when using aliasses of bash. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl is another option - but then you **must** fix all sub vcls. These here are basically same, but all? stupid errors and unlogical things are fixed now.
 
