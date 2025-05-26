@@ -4,11 +4,6 @@ sub sec_headers {
 	### For me this is easier solution because now I can handle everything in one place
 	### Everything here works only if not piped. So, Discourse can't be secured here - there is no need, though, becauce Discourse sets these up by itself
 
-	## Cross Site Scripting, aka. XSS
-	if (!resp.http.X-XSS-Protection) {
-		set resp.http.X-XSS-Protection = "1; mode=block";
-	}
-	
 	## Content Security Policy, aka. CSP
 	# Use your browser to find out if (or when...) there is some CSP violations by the rules
 	# or set up reporting endpoint
@@ -190,6 +185,7 @@ sub sec_headers {
 		
 		# I have too many issues with Safari so I don't use acting CSP with WooCommerce - The issues are mostly with embeds
 		# Heads up: Safari caches even CSP.
+		#Commented, because of return(pipe)
 		if (req.http.User-Agent ~ "Safari" && req.http.host ~ "store.") {
 			set resp.http.Content-Security-Policy-Report-Only = resp.http.Content-Security-Policy;
 			unset resp.http.Content-Security-Policy;
@@ -224,10 +220,22 @@ sub sec_headers {
 	# The end of CSP
 	}
 	
-	## HTTP Strict Transport Security, aka. HSTS
-	# Applies only if a backend doesn't set HSTS as it normally doesn't; if it comes from frontend, like proxy as Nginx, Varnish doesn't see it
-	if (!resp.http.Strict-Transport-Security) {
-		set resp.http.Strict-Transport-Security = "max-age=31536000; includeSubdomains; ";
+	# HTTP Strict Transport Security (HSTS)
+	# This header instructs browsers to always use HTTPS for this domain,
+	# and to remember this preference for the specified duration.
+	#
+	# Since Varnish does not handle HTTPS directly, it cannot natively
+	# determine whether the client originally connected via HTTPS.
+	# In a typical architecture (e.g., Nginx → Varnish → Apache),
+	# the TLS terminator (Nginx) sets the header X-Forwarded-Proto to
+	# indicate the original request scheme.
+	#
+	# We only add the HSTS header if the original request came in over HTTPS,
+	# to avoid misinforming browsers when running on development environments
+	# or during HTTP requests that should not trigger HSTS behavior.
+	
+	if (!resp.http.Strict-Transport-Security && req.http.X-Forwarded-Proto == "https") {
+		set resp.http.Strict-Transport-Security = "max-age=31536000; includeSubDomains;";
 	}
 
 	## MIME sniffing
@@ -242,8 +250,13 @@ sub sec_headers {
 	}
 	
 	# I have some embed issues and I need full referring url
+	#if (req.http.host ~ "katiska.eu") {
+	#	set resp.http.Referrer-Policy = "unsafe-url";
+	#}
+	# but this might be better:
+	# safer fallback if full referrer not needed anymore
 	if (req.http.host ~ "katiska.info") {
-		set resp.http.Referrer-Policy = "unsafe-url";
+		set resp.http.Referrer-Policy = "strict-origin-when-cross-origin";
 	}
 	
 	# Remove X-Frame-Optios if CSP is in use
