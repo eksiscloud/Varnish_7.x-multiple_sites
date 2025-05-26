@@ -117,6 +117,9 @@ include "/etc/varnish/ext/manipulate.vcl";
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
+# Some security related headers
+include "/etc/varnish/ext/security.vcl";
+
 # Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
 # Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
 # Back to auto: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed auto
@@ -439,6 +442,11 @@ sub vcl_deliver {
 	## Let's add the origin by cors.vcl, if needed
 	# ext/cors.vcl
 	call cors_deliver;
+
+	## A little bit more security using some headers
+	# CSP is done in WordPresses
+	# ext/addons/security.vcl
+	call sec_headers;
 	
 	## Some counters and that kind of stuff
 	# include/counters.vcl
