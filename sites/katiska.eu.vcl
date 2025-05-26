@@ -99,6 +99,8 @@ include "/etc/varnish/ext/ban-countries.vcl";
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
+include "/etc/varnish/ext/403.vcl";
+
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
 
@@ -289,7 +291,7 @@ sub vcl_recv {
 	# ext/probes.vcl
 	if (req.http.x-bot != "visitor") {
 		call tech_things;
-	}
+	} 
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/nice-bot.vcl
@@ -297,6 +299,14 @@ sub vcl_recv {
 		call cute_bot_allowance;
 	}
 	
+	# Huge list of urls and pages that are constantly knocked
+	# There is no one to listening, and it isn't creating any load, buy is is really annoying
+	# So I waste money and resources to give an error to them
+	# ext/403.vcl
+	if (req.http.x-bot != "(visitor|nice)") {
+		call stop_pages;
+	}
+
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
 	# There is big chance it is bot/scraper, but we have false identifications anyway. 
