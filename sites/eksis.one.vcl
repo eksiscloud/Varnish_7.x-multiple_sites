@@ -214,6 +214,9 @@ sub vcl_recv {
 		set req.http.X-Real-IP = client.ip;
 	}
 
+	## Just to be on safe side, if there is i.e. return(pass/restart) that comes from a situation that can mess things
+	unset req.http.X-Saved-Origin;
+
 	## Forbidden means forbidden
 	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
         if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
@@ -308,6 +311,10 @@ sub vcl_recv {
 	# include/ban_purge.vcl
 	call oblivion;
 	
+	## Setup CORS
+	# ext/cors.vcl
+	call cors;
+
 	## These must, should or could do before cookie monster
 	# includes/pre-wordpress.vcl
 	call before_wp;
@@ -429,9 +436,9 @@ sub vcl_deliver {
 	# include/delivered.vcl
 	call deliverit;
 
-	## Let's add the origin by cors.vcl. But I'm using * so...
+	## Let's add the origin by cors.vcl, if needed
 	# ext/cors.vcl
-	call cors;
+	call cors_deliver;
 	
 	## Some counters and that kind of stuff
 	# include/counters.vcl
