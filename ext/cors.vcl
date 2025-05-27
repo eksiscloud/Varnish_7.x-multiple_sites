@@ -29,21 +29,23 @@ sub cors {
 	}
 }
 
-## Outgoing
-sub cors_deliver {
-	if (req.http.X-Saved-Origin) {
-		set resp.http.Access-Control-Allow-Origin = req.http.X-Saved-Origin;
-		set resp.http.Access-Control-Allow-Methods = "GET, POST, OPTIONS";
-		set resp.http.Access-Control-Allow-Headers = "Content-Type, Authorization";
-		set resp.http.Access-Control-Allow-Credentials = "true";
-		set resp.http.X-CORS-Debug = "Enabled for " + req.http.X-Saved-Origin;
-	} else {
-		unset resp.http.Access-Control-Allow-Origin;
-		unset resp.http.Access-Control-Allow-Methods;
-		unset resp.http.Access-Control-Allow-Headers;
-		unset resp.http.Access-Control-Allow-Credentials;
-		unset resp.http.X-CORS-Debug;
-	}
-}
 
 # The end
+
+## Outgoing
+sub cors_deliver {
+
+        if (req.http.X-Saved-Origin) {
+                set resp.http.Access-Control-Allow-Origin = req.http.X-Saved-Origin;
+                set resp.http.Access-Control-Allow-Methods = "GET, POST, OPTIONS";
+                set resp.http.Access-Control-Allow-Headers = "Content-Type, Authorization";
+                set resp.http.Access-Control-Allow-Credentials = "true";
+                set resp.http.X-CORS-Debug = "Enabled for " + req.http.X-Saved-Origin;
+        } else {
+                unset resp.http.Access-Control-Allow-Origin;
+                unset resp.http.Access-Control-Allow-Methods;
+                unset resp.http.Access-Control-Allow-Headers;
+                unset resp.http.Access-Control-Allow-Credentials;
+                unset resp.http.X-CORS-Debug;
+        }
+}

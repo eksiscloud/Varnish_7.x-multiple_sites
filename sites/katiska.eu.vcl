@@ -518,7 +518,14 @@ sub vcl_synth {
 	## Synth errors, real on customs
 	# include/erroed.vcl
 	call errorit;
-	
+
+	## Googlebot and amp_taxonomy errors
+        # created by include/clean_up.vcl
+        if (resp.status == 200 && resp.reason == "Not an AMP endpoint.") {
+                set resp.http.Content-Type = "text/plain; charset=utf-8";
+                set resp.http.X-Robots-Tag = "noindex, nofollow";
+        }	
+
 	## Needed here, I suppose
 	return (deliver);
 
