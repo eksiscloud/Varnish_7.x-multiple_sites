@@ -99,7 +99,15 @@ include "/etc/varnish/ext/ban-countries.vcl";
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
-include "/etc/varnish/ext/403.vcl";
+# Kill useless knockers
+#include "/etc/varnish/ext/403.vcl";
+include "/etc/varnish/ext/malicious_url.vcl";
+include "/etc/varnish/ext/match_config_attack.vcl";
+include "/etc/varnish/ext/match_env_attack.vcl";
+include "/etc/varnish/ext/match_other_attack.vcl";
+include "/etc/varnish/ext/match_php_attack.vcl";
+include "/etc/varnish/ext/match_sql_attack.vcl";
+include "/etc/varnish/ext/match_wp_attack.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
@@ -302,9 +310,9 @@ sub vcl_recv {
 	# Huge list of urls and pages that are constantly knocked
 	# There is no one to listening, and it isn't creating any load, buy is is really annoying
 	# So I waste money and resources to give an error to them
-	# ext/403.vcl
+	# ext/malicious_url.vcl
 	if (req.http.x-bot != "(visitor|nice)") {
-		call stop_pages;
+		call malicious_url;
 	}
 
 	# If a user agent isn't identified as user or a bot, its type is unknown.
