@@ -229,7 +229,6 @@ serviceAg/rest/loginProcess/login
 /super-interactive-maps/
 /superstorefinder-wp/
 .suspected
-^/\.svn
 swp_
 ^/SYS/
 /td/v1/optin/
@@ -265,7 +264,6 @@ Telerik
 /vendors/scroll/
 /vendors/swiper/
 /vicidial/
-VMobile\ Cheque\ DayBAKIT
 ^/vpn/
 /vuln.htm
 ^/v/user/login
