@@ -4,17 +4,17 @@ import os
 import re
 from pathlib import Path
 
-# Kansiot: syöte- ja tulostepolut
+# Default directories
 INPUT_DIR = Path("inputs")
 OUTPUT_DIR = Path("ext")
 
-# Puhdistetaan regex:iä VCL-yhteensopivaksi
+# Cleaning regex
 def escape_vcl_regex(p):
     if p.startswith('\\') or '*' in p or '[' in p or '(' in p:
-        return p  # oletetaan, että on jo valmiiksi regex
+        return p  # assuming it is already regex
     return re.escape(p)
 
-# Luodaan yksittäinen match_*.vcl
+# Create  match_*.vcl
 def generate_vcl_block(name, patterns):
     escaped = [escape_vcl_regex(p) for p in patterns]
     joined = "|".join(escaped)
@@ -44,7 +44,7 @@ def main():
         with output_file.open("w", encoding="utf-8") as f:
             f.write(vcl_code)
 
-    print("✅ match_*.vcl tiedostot luotu. Luo 'malicious_url.vcl' käsin kutsuilla haluamaasi järjestykseen.")
+    print("✅ match_*.vcl generated. Create and edit 'malicious_url.vcl' manually using wanted call order.")
 
 if __name__ == "__main__":
     main()
