@@ -1,4 +1,3 @@
-^/[1-9]/
 ^/[1-9][1-9][1-9][1-9]/
 /404-to-301/
 Account/LoginToIbo
@@ -22,15 +21,12 @@ apple-app-site-association
 ^/at-grizzle-suvi-lehto
 ^/atutor
 ^/authorization/
-autodiscover.xml
-^/[a-z]/
 ^/Backoffice/
 ^/backup/
 .bak$
 /bitrix/
 ^/bk/
 ^/_blog/
-^/blog/
 ^/blogs/
 BlogTypeView.do
 /boaform/
@@ -211,7 +207,6 @@ serviceAg/rest/loginProcess/login
 ^/shell
 ^/shop/
 /SimplePie/
-^/site/
 ^/sites/
 ^/skin/
 /solr/
@@ -248,7 +243,6 @@ Telerik
 /t_file_wp/
 ^/themes/
 /themes/themes/sketch/
-/themes/twenty(ten|eleven|thirteen|fourteen|fifteen|sixteen|seventeen|nineteen|twenty)
 /theplus_elementor_addon/
 ^/theuploader
 ^/The Uploader
@@ -285,8 +279,6 @@ wallet.dat
 ^/website/
 /woo-advanced-shipment-tracking/
 /woocommerce-upload-files/
-^/wordpress
-^/wordpress/
 /wordpress/wp-admin/
 /worprees-plugin-bug-dar/
 ^/wp/

@@ -3,9 +3,7 @@
 /wp-file-manager/
 /wp-hotel-booking/
 /wp-user-avatar/
-/wp-admin/admin-ajax.php\?action\=revslider_show_image\&img\=../wp-config.php
 /wp-admin/asd.php
-/wp-admin/class-adminsbar.php
 /wp-admin/css/Marvins.php
 /wp-admin/images/uni.php
 /wp-admin/network/
