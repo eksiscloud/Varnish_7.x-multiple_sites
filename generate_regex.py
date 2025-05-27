@@ -1,10 +1,12 @@
+#!/usr/bin/env python3
+
 import os
 import re
 
 # chmod +x
 
 INPUT_DIR = "inputs"
-OUTPUT_DIR = "includes"
+OUTPUT_DIR = "ext"
 
 # For sanitation
 def escape_vcl_regex(p):
