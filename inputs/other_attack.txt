@@ -179,6 +179,7 @@ nmaplowercheck
 ^/\.remote
 ^/remote/
 ^/replacelivedb
+\?replytocom
 ^/rss/catalog/notifystock
 ^/rss/order/new
 ^/\.save
