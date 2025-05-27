@@ -33,7 +33,7 @@ import xkey;		# another way to ban
 
 ## includes are normally in vcl
 # Let's cleanup first, lightlu
-include "/etc/varnish/include/clean_up";
+include "/etc/varnish/include/clean_up.vcl";
 
 # Pure normalizing and similar, normally done first
 include "/etc/varnish/include/normalize.vcl";
