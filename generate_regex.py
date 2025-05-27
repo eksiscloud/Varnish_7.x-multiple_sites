@@ -52,7 +52,7 @@ def main():
 
     # Create main function
     master_vcl = generate_master_block(sub_names)
-    with open(os.path.join(OUTPUT_DIR, "is_malicious_url.vcl"), 'w', encoding='utf-8') as f:
+    with open(os.path.join(OUTPUT_DIR, "malicious_url.vcl"), 'w', encoding='utf-8') as f:
         f.write(master_vcl)
 
     print("✅ All VCL-files are generated succesfully.")
