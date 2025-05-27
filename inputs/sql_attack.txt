@@ -1,0 +1,8 @@
+backup.sql
+^/database.sql
+/db_dump.sql
+/katiskainfo.sql
+mysql.sql
+/site.sql
+source.sql
+web.sql
