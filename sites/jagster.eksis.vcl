@@ -32,6 +32,9 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 import xkey;		# another way to ban
 
 ## includes are normally in vcl
+# Let's cleanup first, lightlu
+include "/etc/varnish/include/clean_up.vcl";
+
 # Pure normalizing and similar, normally done first
 include "/etc/varnish/include/normalize.vcl";
 
@@ -99,6 +102,16 @@ include "/etc/varnish/ext/ban-countries.vcl";
 # Banning by ASN (uses geoip-VMOD)
 include "/etc/varnish/ext/asn.vcl";
 
+# Kill useless knockers
+#include "/etc/varnish/ext/403.vcl";
+include "/etc/varnish/ext/malicious_url.vcl";
+include "/etc/varnish/ext/match_config_attack.vcl";
+include "/etc/varnish/ext/match_env_attack.vcl";
+include "/etc/varnish/ext/match_other_attack.vcl";
+include "/etc/varnish/ext/match_php_attack.vcl";
+include "/etc/varnish/ext/match_sql_attack.vcl";
+include "/etc/varnish/ext/match_wp_attack.vcl";
+
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
 
@@ -116,6 +129,9 @@ include "/etc/varnish/ext/manipulate.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
+
+# Some security related headers
+include "/etc/varnish/ext/security.vcl";
 
 # Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
 # Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
@@ -209,14 +225,14 @@ sub vcl_recv {
 		set req.http.X-Real-IP = client.ip;
 	}
 
-	## Just to be on safe side, if there is i.e. return(pass/restart) that comes from a situation that can mess things
-        unset req.http.X-Saved-Origin;
-
 	## Forbidden means forbidden
 	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
         if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
                 return (synth(403, "Access Denied " + req.http.X-Real-IP));
         }
+
+	## Few small things before we start working
+	call clean_up;
 
 	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
@@ -281,7 +297,7 @@ sub vcl_recv {
 	# ext/probes.vcl
 	if (req.http.x-bot != "visitor") {
 		call tech_things;
-	}
+	} 
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/nice-bot.vcl
@@ -289,6 +305,14 @@ sub vcl_recv {
 		call cute_bot_allowance;
 	}
 	
+	# Huge list of urls and pages that are constantly knocked
+	# There is no one to listening, and it isn't creating any load, buy is is really annoying
+	# So I waste money and resources to give an error to them
+	# ext/malicious_url.vcl
+	if (req.http.x-bot != "(visitor|nice)") {
+		call malicious_url;
+	}
+
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
 	# There is big chance it is bot/scraper, but we have false identifications anyway. 
@@ -305,11 +329,11 @@ sub vcl_recv {
 	## Ban & Purge
 	# include/ban_purge.vcl
 	call oblivion;
-
+	
 	## Setup CORS
 	# ext/cors.vcl
 	call cors;
-	
+
 	## These must, should or could do before cookie monster
 	# includes/pre-wordpress.vcl
 	call before_wp;
@@ -434,6 +458,11 @@ sub vcl_deliver {
 	## Let's add the origin by cors.vcl, if needed
 	# ext/cors.vcl
 	call cors_deliver;
+
+	## A little bit more security using some headers
+	# CSP is done in WordPresses
+	# ext/addons/security.vcl
+	call sec_headers;
 	
 	## Some counters and that kind of stuff
 	# include/counters.vcl
@@ -484,7 +513,14 @@ sub vcl_synth {
 	## Synth errors, real on customs
 	# include/erroed.vcl
 	call errorit;
-	
+
+	## Googlebot and amp_taxonomy errors
+        # created by include/clean_up.vcl
+        if (resp.status == 200 && resp.reason == "Not an AMP endpoint.") {
+                set resp.http.Content-Type = "text/plain; charset=utf-8";
+                set resp.http.X-Robots-Tag = "noindex, nofollow";
+        }	
+
 	## Needed here, I suppose
 	return (deliver);
 
