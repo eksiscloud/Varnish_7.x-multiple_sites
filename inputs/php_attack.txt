@@ -41,6 +41,7 @@ phpMyAdmin
 ^/leaf.php
 ^/moduless.php/
 /new_pluginwp.php
+/password.php
 ^/phpunit/phpunit/src/Util/PHP/eval-stdin.php
 ^/phpunit/phpunit/Util/PHP/eval-stdin.php
 ^/phpunit/src/Util/PHP/eval-stdin.php
@@ -52,6 +53,7 @@ phpMyAdmin
 ^/searchreplacedb2.php
 ^/srx.php
 ^/style.php
+^/url.php
 /wordpress/wp-login.php
 /wordpress/xmlrpc.php
 /wp-content/wp2.php

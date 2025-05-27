@@ -37,6 +37,8 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "aiohttp"
 		|| req.http.User-Agent ~ "akka-http/"					# malicious - done
 		|| req.http.User-Agent ~ "ALittle"
+		|| req.http.User-Agent ~ "Amazon-Advertising-ad-standards-bot"
+                || req.http.User-Agent ~ "Amazonbot"
 		|| req.http.User-Agent ~ "AmazonAdBot"
 		|| req.http.User-Agent ~ "Amazon CloudFront"			# malicious - done
 		|| req.http.User-Agent == "AmazonMusic"
