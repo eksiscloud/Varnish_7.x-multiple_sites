@@ -53,7 +53,7 @@ include "/etc/varnish/ext/manipulate.vcl";
 include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
-include "/etc/varnish/ext/cors.vcl";
+#include "/etc/varnish/ext/cors.vcl";
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
@@ -875,7 +875,7 @@ sub vcl_deliver {
 
 	## Let's add the origin by cors.vcl. But I'm using * so...
 	# ext/addons/cors.vcl
-	call cors;
+	#call cors;
 	
 	# Origin should send to browser
 	set resp.http.Vary = resp.http.Vary + ",Origin";
@@ -965,7 +965,7 @@ sub vcl_purge {
 #
 sub vcl_synth {
 
-	call cors;
+	#call cors;
 	
 	### Custom errors
 		
