@@ -32,6 +32,9 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 import xkey;		# another way to ban
 
 ## includes are normally in vcl
+# Let's cleanup first, lightlu
+include "/etc/varnish/include/clean_up";
+
 # Pure normalizing and similar, normally done first
 include "/etc/varnish/include/normalize.vcl";
 
@@ -227,14 +230,14 @@ sub vcl_recv {
 		set req.http.X-Real-IP = client.ip;
 	}
 
-	## Just to on safe side, if there is i.e. return(pass/restart) that comes from a situation that can mess things
-	unset req.http.X-Saved-Origin;
-
 	## Forbidden means forbidden
 	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
         if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
                 return (synth(403, "Access Denied " + req.http.X-Real-IP));
         }
+
+	## Few small things before we start working
+	call clean_up;
 
 	## GeoIP-blocking
 	# 1st: GeoIP and normalizing country codes to lower case, 
