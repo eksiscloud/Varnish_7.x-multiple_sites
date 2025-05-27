@@ -2,62 +2,49 @@
 
 import os
 import re
+from pathlib import Path
 
-# chmod +x
+# Kansiot: syöte- ja tulostepolut
+INPUT_DIR = Path("inputs")
+OUTPUT_DIR = Path("ext")
 
-INPUT_DIR = "inputs"
-OUTPUT_DIR = "ext"
-
-# For sanitation
+# Puhdistetaan regex:iä VCL-yhteensopivaksi
 def escape_vcl_regex(p):
     if p.startswith('\\') or '*' in p or '[' in p or '(' in p:
-        return p  # finished regex
+        return p  # oletetaan, että on jo valmiiksi regex
     return re.escape(p)
 
+# Luodaan yksittäinen match_*.vcl
 def generate_vcl_block(name, patterns):
     escaped = [escape_vcl_regex(p) for p in patterns]
     joined = "|".join(escaped)
-    return f"""
+
+    return f'''
 sub match_{name} {{
     if (req.url ~ "^/({joined})") {{
-        set req.http.X-Match = "1";
+        if (req.http.X-County-Code ~ "fi" || req.http.X-Language ~ "fi") {{
+            return (synth(403, "Forbidden"));
+        }} else {{
+            return (synth(666, "Security issue"));
+        }}
     }}
 }}
-""".strip()
-
-def generate_master_block(subs):
-    lines = ["sub is_malicious_url {"]
-    for s in subs:
-        lines.append(f"    call match_{s};")
-    lines.append("}")
-    return "\n".join(lines)
+'''.strip()
 
 def main():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    sub_names = []
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for filename in os.listdir(INPUT_DIR):
-        if not filename.endswith(".txt"):
-            continue
-
-        base_name = os.path.splitext(filename)[0]  # i.e. url_attacks
-        sub_names.append(base_name)
-
-        with open(os.path.join(INPUT_DIR, filename), 'r', encoding='utf-8') as f:
+    for file in INPUT_DIR.glob("*.txt"):
+        base_name = file.stem
+        with file.open("r", encoding="utf-8") as f:
             patterns = [line.strip() for line in f if line.strip()]
 
         vcl_code = generate_vcl_block(base_name, patterns)
-        output_file = os.path.join(OUTPUT_DIR, f"match_{base_name}.vcl")
-
-        with open(output_file, 'w', encoding='utf-8') as f:
+        output_file = OUTPUT_DIR / f"match_{base_name}.vcl"
+        with output_file.open("w", encoding="utf-8") as f:
             f.write(vcl_code)
 
-    # Create main function
-    master_vcl = generate_master_block(sub_names)
-    with open(os.path.join(OUTPUT_DIR, "malicious_url.vcl"), 'w', encoding='utf-8') as f:
-        f.write(master_vcl)
-
-    print("✅ All VCL-files are generated succesfully.")
+    print("✅ match_*.vcl tiedostot luotu. Luo 'malicious_url.vcl' käsin kutsuilla haluamaasi järjestykseen.")
 
 if __name__ == "__main__":
     main()
