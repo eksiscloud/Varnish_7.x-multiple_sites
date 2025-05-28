@@ -255,6 +255,6 @@ sub errorit {
 			</body>
 		</html>
 	"} );
-
+	return(deliver);
 }
 
