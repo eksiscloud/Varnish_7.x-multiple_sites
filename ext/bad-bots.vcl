@@ -147,6 +147,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "fyeo-crawler"
 		# G
 		|| req.http.User-Agent ~ "GarlikCrawler"
+		|| req.http.User-Agent ~ "GeedoProductSearch"
 		|| req.http.User-Agent ~ "GenomeCrawlerd"
 		|| req.http.User-Agent ~ "GetIntent"
 		|| req.http.User-Agent ~ "GetPodcast"

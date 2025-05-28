@@ -75,6 +75,7 @@ ckfinder
 /feature/legal-notices.jsp
 /feed/wp-admin/
 /feed/wp-includes/
+/filemanager/
 ^/_finance_doubledown
 /formcraft/
 ^/fr/
