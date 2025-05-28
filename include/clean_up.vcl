@@ -8,14 +8,11 @@ sub clean_up {
 	## Googlebot is flooding with this and filling logs. Now it can't reach the backend
 	# I'm doing this in Nginx and not logging.
 	# This helps server wide and returns 410, if wanted:
-	# location ~* \?taxonomy=amp_validation_error&term= {
-	#    access_log off;
-	#    add_header X-Robots-Tag "noindex, nofollow" always;
-	#    default_type text/plain;
-	#    return 410 "Gone. This taxonomy never existed.\n";
-	#}
-	if (req.url ~ "taxonomy=amp_validation_error&term=") {
-		return (synth(200, "Not an AMP endpoint.\n"));
+	# if ($arg_taxonomy ~* "^(amp_validation_error|knowledgebase_tag|.*_error)$") {
+	# return 410 "Gone. This taxonomy never existed.\n";
+	# }
+	if (req.url ~ "taxonomy=(amp_validation_error|.*_error|knowledgebase_tag)&term=") {
+		return(synth(811, "Gone. This taxonomy never existed.\n")); # synth 410 only for this purpose
 	}
 
 # the end
