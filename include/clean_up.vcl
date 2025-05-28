@@ -11,7 +11,7 @@ sub clean_up {
 	# if ($arg_taxonomy ~* "^(amp_validation_error|knowledgebase_tag|.*_error)$") {
 	# return 410 "Gone. This taxonomy never existed.\n";
 	# }
-	if (req.url ~ "taxonomy=(amp_validation_error|.*_error|knowledgebase_tag)&term=") {
+	if (req.url ~ "taxonomy=") {
 		return(synth(811, "Gone. This taxonomy never existed.\n")); # synth 410 only for this purpose
 	}
 
