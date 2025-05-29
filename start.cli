@@ -1,11 +1,11 @@
-vcl.load poochie-1 /etc/varnish/sites/poochierevival.vcl
+vcl.load poochie-1 /etc/varnish/sites/shared_wp.vcl
 vcl.load matomo-1 /etc/varnish/sites/matomo.vcl
-vcl.load dev-1 /etc/varnish/sites/dev.eksis.vcl
-vcl.load jagster-1 /etc/varnish/sites/jagster.eksis.vcl
-vcl.load eksis-1 /etc/varnish/sites/eksis.one.vcl
-vcl.load selko-1 /etc/varnish/sites/selko.katiska.vcl
+vcl.load dev-1 /etc/varnish/sites/shared_wp.vcl
+vcl.load jagster-1 /etc/varnish/sites/shared_wp.vcl
+vcl.load eksis-1 /etc/varnish/sites/shared_wp.vcl
+vcl.load selko-1 /etc/varnish/sites/shared_wp.vcl
 vcl.load store-1 /etc/varnish/sites/store.katiska.vcl
-vcl.load katiska-1 /etc/varnish/sites/katiska.eu.vcl
+vcl.load katiska-1 /etc/varnish/sites/shared_wp.vcl
 vcl.label poochie poochie-1
 vcl.label matomo matomo-1
 vcl.label dev dev-1
