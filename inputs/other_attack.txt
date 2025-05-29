@@ -46,6 +46,7 @@ ckfinder
 ^/compra/
 ^/console
 ^/Content/
+/controllers/
 ^/core/
 /ct-ultimate-gdpr/
 ^/cv/
