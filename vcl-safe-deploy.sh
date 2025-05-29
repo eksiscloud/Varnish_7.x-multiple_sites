@@ -1,0 +1,1 @@
+/usr/local/bin/vcl-safe-deploy.sh
