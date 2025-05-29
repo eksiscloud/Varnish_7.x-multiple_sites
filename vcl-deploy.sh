@@ -5,7 +5,7 @@
 # Timestamp for versioning
 timestamp=$(date +"%Y%m%d_%H%M%S")
 
-# Sites and vcls, must follow label/load 
+# Sites and vcls, must ne same load than in start.cli
 declare -A vclmap=(
     [poochie]="/etc/varnish/sites/poochierevival.vcl"
     [dev]="/etc/varnish/sites/dev.eksis.vcl"
