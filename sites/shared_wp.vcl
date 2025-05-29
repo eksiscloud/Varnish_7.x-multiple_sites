@@ -307,7 +307,7 @@ sub vcl_recv {
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/nice-bot.vcl
-	if (req.http.x-bot != "(visitor|tech)") {
+	if (req.http.x-bot !~ "(visitor|tech)$") {
 		call cute_bot_allowance;
 	}
 	
@@ -315,7 +315,7 @@ sub vcl_recv {
 	# There is no one to listening, and it isn't creating any load, buy is is really annoying
 	# So I waste money and resources to give an error to them
 	# ext/malicious_url.vcl
-	if (req.http.x-bot != "(visitor|nice)") {
+	if (req.http.x-bot !~ "(visitor|nice)$") {
 		call malicious_url;
 	}
 
