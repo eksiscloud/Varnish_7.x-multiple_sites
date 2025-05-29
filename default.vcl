@@ -66,11 +66,11 @@ sub vcl_recv {
 	} 
 	
 	if (req.http.host == "selko.katiska.eu") {
-		return(vcl(selkokatiska));
+		return(vcl(selko));
 	} 
 	
 	if (req.http.host == "www.eksis.one") {
-                return(vcl(eksisone));
+                return(vcl(eksis));
         } 
 	
 	if (req.http.host == "www.poochierevival.info") {
@@ -86,7 +86,7 @@ sub vcl_recv {
         } 
 
 	if (req.http.host == "stats.eksis.eu") {
-                return(vcl(stats));
+                return(vcl(matomo));
 	}	
 
 	return (synth(404));
