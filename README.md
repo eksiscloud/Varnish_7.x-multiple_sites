@@ -102,7 +102,13 @@ HEADS UP: I don't think anything of that is really issue anymore. it has fixed n
 
 Do: `varnishd -C -f /etc/varnish/sites/site.vcl`
 
-* `systemctl reload varnish` doesn't work.
+* `systemctl reload varnish` doesn't work. Unless you want... If you using one of those two vcl-* scripts it is quite easy task.
+
+Edit system unit of Varnish and add this under `[Service]` section:
+
+`ExecReload=/usr/local/bin/vcl-safe-deploy.sh` (or the other one)
+
+Comment out original one. Save and load daemon, and that's it. But those scripts reload every host. Quite often it is wanted, if you are using include/call sub vcl. But if you need to reload single or some hosts, then you can use next solution.
 
 Do loading new vcl and connecting to label
 
@@ -141,5 +147,5 @@ Because all of that happens in CLI your `varnishd` shuts down when you close CLI
 
 ## My opinion
 
-This is one solution when using multiple hosts. But lack of `systemctl reload varnish` makes it a bit handful for amateurs. I must say that after quite short while load/labe route is better option, soecially when using aliasses of bash. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl is another option - but then you **must** fix all sub vcls. These here are basically same, but all? stupid errors and unlogical things are fixed now.
+This is one solution when using multiple hosts. I must say that after quite short while load/labe route is better option, soecially when using aliasses of bash or scripts. Perhaps using https://github.com/eksiscloud/Varnish_7.x/blob/main/default.vcl is another option - but then you **must** fix all sub vcls. These here are basically same, but all? stupid errors and unlogical things that bothers the old one, are fixed here now.
 
