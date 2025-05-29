@@ -43,8 +43,8 @@ sub be_ttled {
         # Can I do beresp.status == 302 || beresp.status == 307 ?
         if (beresp.status == 404) {
                 unset beresp.http.Cache-Control;
-		set beresp.http.Cache-Control = "public, max-age=300";
-                set beresp.ttl = 1h;
+		set beresp.http.Cache-Control = "public, max-age=120";
+                set beresp.ttl = 120s;
         }
 
 	## 301 and 410 are quite steady, again, so let Varnish cache resuls from backend
