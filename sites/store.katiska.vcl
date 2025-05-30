@@ -266,13 +266,6 @@ sub vcl_recv {
 		return(synth(405, "Non-valid HTTP method!"));
 	}
 
-
-	###### That's it. I don't need more for this Woocommerce
-	return(pipe);
-
-	######
-
-	
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
 	set req.http.accept-language = lang.filter(req.http.accept-language);
@@ -294,6 +287,17 @@ sub vcl_recv {
 	if (req.http.x-bot !~ "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
+
+	# Huge list of urls and pages that are constantly knocked
+        # There is no one to listening, and it isn't creating any load, but those are still hammering backend
+        # acting like low level ddos.
+        # So I waste money and resources to give an error to them
+        # ext/malicious_url.vcl
+        call malicious_url;
+
+###### That's it. I don't need more for this Woocommerce
+        return(pipe);
+######
 		
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
