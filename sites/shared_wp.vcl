@@ -312,12 +312,11 @@ sub vcl_recv {
 	}
 	
 	# Huge list of urls and pages that are constantly knocked
-	# There is no one to listening, and it isn't creating any load, buy is is really annoying
+	# There is no one to listening, and it isn't creating any load, but those are still hammering backend
+	# acting like low level ddos.
 	# So I waste money and resources to give an error to them
 	# ext/malicious_url.vcl
-	if (req.http.x-bot !~ "(visitor|nice)$") {
-		call malicious_url;
-	}
+	call malicious_url;
 
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
