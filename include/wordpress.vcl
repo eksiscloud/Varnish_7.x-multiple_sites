@@ -61,15 +61,11 @@ sub wp {
 	if (req.url ~ "^/api/(v1|v2)/") {
 		return(pass);
 	}
-        
+
         # WordPress
         if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
                 return(synth(403, "Unauthorized request"));
         }
-
-#       if (req.url ~ "^/wp-json/") {
-#               return(pass);
-#       }
 
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
