@@ -54,6 +54,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "Asana"
 		|| req.http.User-Agent ~ "AspiegelBot"					# good
 		|| req.http.User-Agent ~ "Audacy-Podcast-Scraper"
+		|| req.http.User-Agent ~ "AudigentAdBot"
 		|| req.http.User-Agent ~ "AudioNow"						# https://audionow.de/
 		|| req.http.User-Agent ~ "AvocetCrawler"
 		|| req.http.User-Agent ~ "AVSearch"
