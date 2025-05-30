@@ -3,6 +3,7 @@
 /wp-file-manager/
 /wp-hotel-booking/
 /wp-user-avatar/
+/\.wp-admin.php
 /wp-admin/asd.php
 /wp-admin/css/Marvins.php
 /wp-admin/images/uni.php
@@ -22,12 +23,14 @@
 /wp-includes/theme-compat/back-up.php
 /wp-includes/js/thickbox/preview.php
 /wp-includes/wlwmanifest.xml
+/\.wp-content.php
 /wp-content/bees.php
 /wp-content/force-download.php
 /wp-content/plugins/wp-types.php
 /wp-content/themes/wp-update.php
 /wp-content/uploads/file-manager/
 /wp-content/wp2.php
+/\.wp-config.php
 /wp-config-backup
 /wp-config.php[1-9]
 /wp-config[1-9]
