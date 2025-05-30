@@ -291,7 +291,7 @@ sub vcl_recv {
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/filtering/nice-bot.vcl
-	if (req.http.x-bot != "(visitor|tech)") {
+	if (req.http.x-bot !~ "(visitor|tech)") {
 		call cute_bot_allowance;
 	}
 		
