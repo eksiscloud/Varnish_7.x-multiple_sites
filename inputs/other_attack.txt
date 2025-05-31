@@ -9,6 +9,7 @@ Account/ValidateCode/
 ^/administrator/
 ^/air-venturi-controls
 ^/ajax/
+/all-in-one-seo-pack/
 /alternate-lite/
 /apismtp/
 ^/app/
@@ -87,6 +88,8 @@ ckfinder
 ^/GponForm/
 ^/graphql
 ^/heibing
+/HelloDollyV2/
+/hello_dolly_v2.php
 ^/HNAP[1-9]/
 ^/HNAPI/
 ^/home/
