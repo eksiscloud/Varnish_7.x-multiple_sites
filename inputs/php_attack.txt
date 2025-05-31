@@ -42,6 +42,8 @@ phpMyAdmin
 ^/moduless.php/
 /new_pluginwp.php
 /password.php
+/phpinfo
+/phpinfo.php
 ^/phpunit/phpunit/src/Util/PHP/eval-stdin.php
 ^/phpunit/phpunit/Util/PHP/eval-stdin.php
 ^/phpunit/src/Util/PHP/eval-stdin.php
@@ -51,6 +53,7 @@ phpMyAdmin
 ^connectors/resource/s_eval.php
 ^/cache/seo_script.php
 ^/searchreplacedb2.php
+/serverinfo.pho
 ^/srx.php
 ^/style.php
 ^/url.php
