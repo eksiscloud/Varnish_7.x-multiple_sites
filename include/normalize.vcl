@@ -1,8 +1,5 @@
 sub set_normalizing {
 
-	## Reset hit/miss counter
-        unset req.http.x-cache;
-
         ## It will terminate badly formed requests
         ## Build-in rule. But works only if there isn't return(...) that forces jump away
         if (!req.http.host && req.esi_level == 0 && req.proto ~ "^(?i)HTTP/1.1") {
@@ -10,7 +7,7 @@ sub set_normalizing {
                 return (synth(400));
         }
 
-        # if there is PROXY in use
+        ## if there is PROXY in use
         # Used with Hitch or similar dumb ones 
         #elseif (!req.http.X-Forwarded-Proto && !req.http.Scheme && !proxy.is_ssl()) {
         #       return(synth(750));
@@ -24,6 +21,17 @@ sub set_normalizing {
         ## Normalize the header, remove the port (in case you're testing this on various TCP ports)
         set req.http.host = std.tolower(req.http.host);
         set req.http.host = regsub(req.http.host, ":[0-9]+", "");
+
+	## I don`t like capitalized ones
+	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
+
+        # Quite often russians lie origin country, but are declaring russian as language
+        if (req.http.Accept-Language ~
+                "(ru)"
+        ) {
+                std.log("banned language: " + req.http.Accept-Language);
+                return(synth(403, "Unsupported language: " + req.http.Accept-Language));
+        }
 
         ## Setting http headers for backend
         if (req.restarts == 0) {

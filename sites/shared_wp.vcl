@@ -98,12 +98,6 @@ include "/etc/varnish/include/showed.vcl";
 include "/etc/varnish/include/erroed.vcl";
 
 ## ext are something extra
-# List of banned countries
-include "/etc/varnish/ext/ban-countries.vcl";
-
-# Banning by ASN (uses geoip-VMOD)
-include "/etc/varnish/ext/asn.vcl";
-
 # Kill useless knockers
 #include "/etc/varnish/ext/403.vcl";
 include "/etc/varnish/ext/malicious_url.vcl";
@@ -125,9 +119,6 @@ include "/etc/varnish/ext/nice-bot.vcl";
 
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
-
-# Centralized way to handle TTLs
-#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -206,9 +197,9 @@ acl forbidden {
 sub vcl_init {
 	
 	## GeoIP
-	new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
-	new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
-	new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
+	#new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
+	#new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
+	#new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
@@ -270,47 +261,6 @@ sub vcl_recv {
 
 	## Few small things before we start working
 	call clean_up;
-
-	## GeoIP-blocking
-	# 1st: GeoIP and normalizing country codes to lower case, 
-	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
-	
-	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
-	# I'll ban or stop a country only after several tries, it is not a decision made easily 
-	# (well... it is actually)
-	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
-	# like from Turkey to Finland via Senegal.
-	# For easier updating of the list ext/ban-countries.vcl
-        call close_doors;
-
-	if (req.http.x-ban-country) {
-		std.log("banned country: " + std.toupper(req.http.x-ban-country));
-		return(synth(403, "Forbidden country: " + std.toupper(req.http.x-ban-country)));
-		unset req.http.x-ban-country;
-	}
-
-	# Quite often russians lie origin country, but are declaring russian as language
-	if (req.http.Accept-Language ~
-                "(ru)"
-	) {
-                std.log("banned language: " + req.http.Accept-Language);
-		return(synth(403, "Unsupported language: " + req.http.Accept-Language));
-	}
-
-	## I can block service provider too using geoip-VMOD.
-	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
-	
-	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
-	# Finding out ASN from whois-data isn't so straight forwarded
-	# You can find it out using ASN lookup like https://hackertarget.com/as-ip-lookup/
-	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
-	# I need this for trash, that are coming from countries I can't ban.
-	# ext/asn.vcl
-	call asn_name;
 
 	## Redirecting http/80 to https/443
         # This could, and perhaps should, do in Nginx, but certbot likes this better
@@ -526,10 +476,7 @@ sub vcl_deliver {
 	## Don't show funny stuff to bots
 	if (req.http.x-bot == "visitor") {
 		# lookup can't be in sub vcl
-		set resp.http.Your-IP-Country = country.lookup("country/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0")) + "/" + std.toupper(req.http.X-Country-Code);
-		set resp.http.Your-IP-City = city.lookup("city/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-		set resp.http.Your-IP-GPS = city.lookup("location/latitude", std.ip(req.http.X-Real-IP, "0.0.0.0")) + " " + city.lookup("location/longitude", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-		set resp.http.Your-IP-ASN = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+		set resp.http.Your-IP-Country = std.toupper(req.http.X-Country-Code);
 	}
 
 	# That's it

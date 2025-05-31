@@ -1,5 +1,8 @@
 sub close_doors {
 
+	### NOT IN USE.
+	### I'm doing this in Nginx
+
 	## The easiest way update Geo banning.
 	# Just using ($server_protocol = HTTP/1.0) { return 444; } in Nginx blocks plenty of these
 	if (req.http.X-Country-Code ~
