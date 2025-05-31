@@ -135,6 +135,24 @@ include "/etc/varnish/ext/cors.vcl";
 # Some security related headers
 include "/etc/varnish/ext/security.vcl";
 
+## Probes are watching if backends are healthy
+## You can check if a backend is  healthy or sick:
+## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
+
+probe sondi {
+    .url = "/healthcheck.txt";  # or you can use just an url
+	# you must have installed libwww-perl:
+    #.request =
+    #  "HEAD / HTTP/1.1"
+    #  "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+    #  "Connection: close"
+    #  "User-Agent: Varnish Health Probe";
+	.timeout = 5s;
+	.interval = 4s;
+	.window = 5;
+	.threshold = 3;
+}
+
 # Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
 # Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
 # Back to auto: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed auto
@@ -151,8 +169,14 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
+	.probe = sondi;
 }
 
+# Apache2 has fallen down
+backend emergency_nginx {
+	.host = "127.0.0.1";
+	.port = "8283";
+}
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
 # Heads up! ACL must be in use, if uncommented.
@@ -202,7 +226,14 @@ sub vcl_init {
 ## Here we are telling to Varnish what to do and what to cache or not. This is not for backend or i.e. browsers
 
 sub vcl_recv {
-	
+
+	## If the backend is done, we change to emergency mode
+	if (!std.healthy(sites)) {
+		set req.backend_hint = emergency_nginx;
+		return (pipe);
+	}
+
+	## All normal and we use this backend
 	set req.backend_hint = sites;
 
 	## Normalize hostname to avoid double caching
@@ -451,6 +482,21 @@ sub vcl_backend_response {
 	## We are at the end
 }
 
+#######################vcl_backend_error###############
+## Tells what to when backend doesn`t give suitable answers and backend_response can't do anything
+## The default action is return(deliver)
+## Normally this block isn't visible. I'm using it for grace/errro 503 situation
+sub vcl_backend_error {
+
+	# Let's try again because there isn an error
+	if (bereq.retries < 1) {
+		return(retry);
+	}
+
+	# If grace-object is available, we use it
+	return(deliver);
+# That`s it
+}
 
 #######################vcl_deliver#####################
 #
