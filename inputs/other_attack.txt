@@ -221,9 +221,7 @@ serviceAg/rest/loginProcess/login
 /SQLite
 /staging/
 ^/stalker_portal/
-^/static/
 ^/statics/
-^/store/
 /store-locator-le/
 ^/stream/
 ^/streaming/
