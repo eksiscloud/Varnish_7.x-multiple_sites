@@ -12,8 +12,8 @@ sub malicious_url {
 	if (req.http.host !~ "www.eksis.one") {
 		if (req.url ~ "^/wordpress") {
 			if (
-			   req.http.X-County-Code ~ "fi"
-			|| req.http.x-language ~ "fi" 
+			   req.http.X-Country-Code ~ "fi"
+			|| req.http.Accept-Language ~ "fi" 
 				) {
 				return(synth(403, "The site is unreachable"));
 			} else {
