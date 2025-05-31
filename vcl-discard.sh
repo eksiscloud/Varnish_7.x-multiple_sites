@@ -1,19 +1,19 @@
 #!/bin/bash
 
-# Basically do varnisdm vcl.discard *
+# Basically it do varnisdm vcl.discard *
 # Usage:
 # ./vcl-discard.sh -> everything than warm ones
 # ./vcl-discard.sh --keep-latest -> keeps latest cold ones too
 
 KEEP_LATEST=false
 
-# Tarkistetaan argumentit
+# Checking arguments
 if [[ "$1" == "--keep-latest" ]]; then
     KEEP_LATEST=true
 fi
 
-# Haetaan kaikki cold & available & labels==0
-# Rakennetaan CSV-muoto: nimi, lämpötila, aika-arvio nimestä (jos löytyy päivämäärä lopusta)
+# Getting every cold & available & labels==0
+# Building CSV: name, temperature, time from name (if there is date in the end)
 vcl_list=$(varnishadm vcl.list -j | jq -r '
     map(select(
         type == "object" and
@@ -26,13 +26,13 @@ vcl_list=$(varnishadm vcl.list -j | jq -r '
 ')
 
 if [ -z "$vcl_list" ]; then
-    echo "✅ Ei poistettavia VCL:iä (cold & labels==0)."
+    echo "✅ No removable VCLs (cold & labels==0)."
     exit 0
 fi
 
-# Jos --keep-latest, suodatetaan tuorein jokaisesta ryhmästä pois
+# If --keep-latest, filtering the most freshest one from every group
 if $KEEP_LATEST; then
-    # Ryhmitetään nimen etuliitteen (ennen alaviivaa) mukaan ja pidetään vain kaikki _muut_ kuin uusin
+    # Groupimg by prefix (before underlime) amd keeping everything _else_ than the newest one
     vcl_to_discard=$(echo "$vcl_list" | awk -F_ '
         {
             if (NF >= 2) {
@@ -44,7 +44,7 @@ if $KEEP_LATEST; then
             }
         }
         END {
-            # Poistetaan jokaisesta ryhmästä kaikki paitsi suurin aikaleima
+            # Remove everything from every group, except the biggest timestamp
             for (p in group) {
                 max = ""
                 for (vcl in group[p]) {
@@ -68,25 +68,25 @@ else
 fi
 
 if [ -z "$vcl_to_discard" ]; then
-    echo "✅ Ei discardattavaa (--keep-latest suodatettu)."
+    echo "✅ Nothing to discard (--keep-latest filtering)."
     exit 0
 fi
 
-# Näytetään käyttäjälle lista
-echo "🧹 Seuraavat VCL:t poistetaan:"
+# Show the list to user
+echo "🧹 Following VCLs will be removed:"
 echo "$vcl_to_discard" | sed 's/^/ - /'
 echo
-read -p "❗ Haluatko varmasti poistaa nämä? (y/N) " confirm
+read -p "❗ Are you sure these should be discarded? (y/N) " confirm
 echo
 
 if [[ "$confirm" =~ ^[Yy]$ ]]; then
     while read -r vcl; do
-        echo "🧹 Discardataan: $vcl"
+        echo "🧹 Discarding: $vcl"
         if ! varnishadm vcl.discard "$vcl"; then
-            echo "⚠️  Virhe: ei voitu poistaa $vcl"
+            echo "⚠️ Error: couldn't remove $vcl"
         fi
     done <<< "$vcl_to_discard"
-    echo "✅ Poisto valmis."
+    echo "✅ Discarding ready."
 else
-    echo "🚫 Poisto keskeytetty."
+    echo "🚫 Discarding interrupted."
 fi
