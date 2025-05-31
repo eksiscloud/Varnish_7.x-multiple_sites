@@ -8,6 +8,14 @@ sub malicious_url {
 	call match_env_attack;
 	call match_other_attack;
 
+	## WordPress login
+	if (req.url ~ "^/wp-login" &&
+	   (req.http.X-Country-Code !~ "fi" ||
+	    req.http.Accept-Language !~ "fi")) 
+	    {
+		return (synth(666, "The site is unreachable"));
+	}
+
 	## I have one site using category wordpress
 	if (req.http.host !~ "www.eksis.one") {
 		if (req.url ~ "^/wordpress") {
