@@ -1,5 +1,7 @@
 sub bad_bot_detection {
 
+#### Not in use
+
 ## I have to set user agent to find out in 404 monitoring of Wordpress who is getting 404.
 ## So, I'll store user agent in X-User-Agent and it will be restored after hashing.
 ##
@@ -208,6 +210,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "l9explore"
 		|| req.http.User-Agent ~ "Lavf"
 		|| req.http.User-Agent ~ "Leap"
+		|| req.http.User-Agent ~ "Leikibot"					# marketing
 		|| req.http.User-Agent ~ "Liana"
 		|| req.http.User-Agent ~ "LieBaoFast"					# bad
 		|| req.http.User-Agent ~ "LightspeedSystemsCrawler"
