@@ -22,5 +22,11 @@ sub hashit {
 		unset req.http.x-language;
 	}
 
+	# And again with X-Country-Code
+	if (req.http.x-country) {
+		set req.http.X-Country-Code = req.http.c-country;
+		unset req.http.x-country;
+	}
 }
 
+ 

@@ -13,5 +13,10 @@ sub these_too {
 	set req.http.x-language = req.http.Accept-Language;
 	unset req.http.Accept-Language;
 
+	## I don't need separated caches used by country code, but I use it in responses
+	set req.http.x-country = req.http.X-Country-Code;
+	unset req.http.X-Country-Code;
+
+# Ends here
 }
 
