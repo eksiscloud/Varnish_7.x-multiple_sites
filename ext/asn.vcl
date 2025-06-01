@@ -12,10 +12,10 @@ sub asn_name {
 	# but everyone here is knocking too often so I'll keep doors closed
 
 	# ASN can be empty sometimes. i stop those request, because it is suspicious
-	if (!req.http.X-ASN || req.http.X-ASN == "unknown") {
-		std.log("Missing ASN info for: " + req.http.X-Real-IP);
-		return(synth(400, "Missing ASN"));
-	}
+	#if (!req.http.X-ASN || req.http.X-ASN == "unknown") {
+	#	std.log("Missing ASN info for: " + req.http.X-Real-IP);
+	#	return(synth(400, "Missing ASN"));
+	#}
 
 	# Actual filtering
 	if (
