@@ -12,6 +12,11 @@ sub deliverit {
 		return(synth(666, "Requests not allowed for " + req.url));
 	}
 
+	## Debug for 403
+	if (resp.status == 403) {
+		call debug_headers;
+	}
+
 	## And now I remove my helpful tag'ish
 	# Now something like this works:
 	# varnishlog -c -g request -i Req* -i Resp* -I Timestamp:Resp -x ReqAcct -x RespUnset -X "RespHeader:(x|X)-(url|host)" 

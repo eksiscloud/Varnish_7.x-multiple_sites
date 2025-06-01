@@ -2,6 +2,11 @@ sub errorit {
 
 	### vcl_synth
 
+	## There is need for debugging
+	if (resp.status == 403) {
+		call debug_headers;
+	}
+
 	### Custom errors
 
 	## Bad request error 400

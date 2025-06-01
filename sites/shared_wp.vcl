@@ -32,7 +32,11 @@ import geoip2;		# Load the GeoIP2 by MaxMind
 import xkey;		# another way to ban
 
 ## includes are normally in vcl
+# www-domains need normalizing
 include "/etc/varnish/include/normalize_host.vcl";
+
+# Debugging 403 errors
+include "/etc/varnish/include/debug_headers.vcl";
 
 # Let's cleanup first, lightlu
 include "/etc/varnish/include/clean_up.vcl";
@@ -238,7 +242,7 @@ sub vcl_recv {
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
-        #return(pipe);	
+        #return(pipe);
 
 	### The work starts here
 
