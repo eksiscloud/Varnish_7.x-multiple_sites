@@ -2,11 +2,6 @@ sub errorit {
 
 	### vcl_synth
 
-	## There is need for debugging
-	if (resp.status == 403) {
-		call debug_headers;
-	}
-
 	### Custom errors
 
 	## Bad request error 400
@@ -34,6 +29,8 @@ sub errorit {
 
 	## forbidden error 403
 	if (resp.status == 403) {
+		call debug_headers;
+		std.log("403 response: " + req.url + " IP=" + req.http.X-Real-IP);
 		set resp.status = 403;
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
