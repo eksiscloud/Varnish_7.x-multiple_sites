@@ -25,13 +25,12 @@ sub set_normalizing {
 	## I don`t like capitalized ones
 	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 
-        # Quite often russians lie origin country, but are declaring russian as language
-        if (req.http.Accept-Language ~
-                "(ru)"
-        ) {
-                std.log("banned language: " + req.http.Accept-Language);
-                return(synth(403, "Unsupported language: " + req.http.Accept-Language));
-        }
+	## Quite often russian lie used IP but keep russian as a language
+	if (req.http.Accept-Language ~ "^ru" &&
+	    req.http.Accept-Language !~ "(?i)fi|en|sv") { 
+		set req.http.X-Match = "only-russian-language";
+		return(synth(403, "Blocked: Russian-only Accept-Language"));
+	}
 
         ## Setting http headers for backend
         if (req.restarts == 0) {
