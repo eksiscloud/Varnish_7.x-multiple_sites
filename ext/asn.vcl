@@ -1,6 +1,7 @@
 sub asn_name {
 
-if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
+	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS
+	if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
                 return (synth(403, "Access Denied " + req.http.X-Real-IP));
         }
 
@@ -9,6 +10,14 @@ if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
 	# Heads up: ASN can and quite often will stop more than just one company
 	# Just coming from some ASN doesn't be reason to hard banning,
 	# but everyone here is knocking too often so I'll keep doors closed
+
+	# ASN can be empty sometimes. i stop those request, because it is suspicious
+	if (!req.http.X-ASN || req.http.X-ASN == "unknown") {
+		std.log("Missing ASN info for: " + req.http.X-Real-IP);
+		return(synth(400, "Missing ASN"));
+	}
+
+	# Actual filtering
 	if (
 		   req.http.x-asn ~ "alibaba"				# Alibaba (US) Technology Co., Ltd., US,CN
 		|| req.http.x-asn ~ "avast-as-cd"					# Privax LTD, GB etc.
@@ -78,6 +87,9 @@ if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
 			std.log("banned ASN: " + req.http.x-asn);
 			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
 		}
-		
+
+	## If you reach this point, you are propably a good guy, so let's remove ASN. It isn't needed anymore.
+	unset req.http.X-ASN;
+
 # The end of the sub
 }

@@ -108,6 +108,9 @@ include "/etc/varnish/ext/match_php_attack.vcl";
 include "/etc/varnish/ext/match_sql_attack.vcl";
 include "/etc/varnish/ext/match_wp_attack.vcl";
 
+# Block using ASN
+include "/etc/varnish/ext/asn.vcl";
+
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
 
@@ -254,10 +257,8 @@ sub vcl_recv {
 	}
 
 	## Forbidden means forbidden
-	## Not ASN but is here anyway: stopping some sites using ACL and reverse DNS:
-        if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ forbidden) {
-                return (synth(403, "Access Denied " + req.http.X-Real-IP));
-        }
+	# Nginx deals with countries and user-agents, but one is left: ASN
+	call asn_name;
 
 	## Few small things before we start working
 	call clean_up;
