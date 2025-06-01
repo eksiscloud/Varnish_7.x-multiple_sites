@@ -66,6 +66,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "axios"						# bad
 		# B
 		|| req.http.User-Agent ~ "Baidu"
+		|| req.http.User-Agent ~ "BacklinksExtendedBot"
 		|| req.http.User-Agent ~ "Barkrowler"
 		|| req.http.User-Agent ~ "BDCbot"
 		|| req.http.User-Agent ~ "bidswitchbot"					# bad
@@ -246,6 +247,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "Needle"
 		|| req.http.User-Agent ~ "NetcraftSurveyAgent"			# bad
 		|| req.http.User-Agent ~ "netEstate"
+		|| req.http.User-Agent ~ "NetPositive"
 		|| req.http.User-Agent ~ "NetSeer"
 		|| req.http.User-Agent ~ "NetSystemsResearch"
 		|| req.http.User-Agent ~ "Nextcloud"
@@ -399,6 +401,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "UniversalFeedParser"			# bad
 		# V
 		|| req.http.User-Agent ~ "VelenPublicWebCrawler"
+		|| req.http.User-Agent ~ "Verity"
 		|| req.http.User-Agent ~ "Viber"
 		|| req.http.User-Agent ~ "VLC/"
 		# W
