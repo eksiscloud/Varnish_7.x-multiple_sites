@@ -29,6 +29,9 @@ sub be_ttled {
 		set beresp.ttl = 0s;
 		return(deliver);
 	}
+	
+	## Conditional 410 for url that may do come back
+	call conditional410;
 
 	## Set hit-for-pass for two minutes if TTL is 0 and response headers
   	## allow for validation. 

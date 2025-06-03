@@ -127,6 +127,9 @@ include "/etc/varnish/ext/nice-bot.vcl";
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
 
+# Conditional 410
+include "/etc/varnish/ext/410conditional.vcl";
+
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
 
@@ -135,16 +138,16 @@ include "/etc/varnish/ext/security.vcl";
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
-## varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
+## varnishlog -g raw -i Backend_health
 
 probe sondi {
-    .url = "/healthcheck.txt";  # or you can use just an url
+    #.url = "/healthcheck.txt";  # or you can use just an url
 	# you must have installed libwww-perl:
-    #.request =
-    #  "HEAD / HTTP/1.1"
-    #  "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-    #  "Connection: close"
-    #  "User-Agent: Varnish Health Probe";
+    .request =
+      "GET /healthcheck.txt HTTP/1.1"
+      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+      "Connection: close"
+      "User-Agent: Varnish Health Probe";
 	.timeout = 5s;
 	.interval = 4s;
 	.window = 5;
