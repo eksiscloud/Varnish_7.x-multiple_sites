@@ -9,7 +9,20 @@ sub conditional410 {
 	## redirect to frontpage. if that happens and you know problematic url structure, change it
 	## in the vcl_recv, not when backend response has been given.
 
-	
+	# Perhaps something like his in functions.php/snippets plugin would be better solution:
+	# Heads up: not tested, but should work.
+	#
+	# add_action('template_redirect', function () {
+	# // Check if an archive and paging (i.e. /category/xyz/page/2/)
+	# 	if (is_archive() && is_paged() && !have_posts()) {
+	#		// Sending 410 Gone header
+	#		status_header(410);
+	#		nocache_headers();
+	#
+	# 		exit;
+	# 	}
+	# });
+
 	if (beresp.status == 404 &&  (
 		bereq.url ~ "/wp-content/cache/" || # old WP Rocket cachefiles, that Bing can't handle
 		bereq.url ~ "/page/" || # empty archive sub categories
