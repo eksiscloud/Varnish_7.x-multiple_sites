@@ -25,7 +25,7 @@ sub conditional410 {
 
 	if (beresp.status == 404 &&  (
 		bereq.url ~ "/wp-content/cache/" || # old WP Rocket cachefiles, that Bing can't handle
-		bereq.url ~ "/page/" || # empty archive sub categories
+		#bereq.url ~ "/page/" || # empty archive sub categories
 		bereq.url ~ "/feed/" # old RSS feeds
 		)) {
 			set beresp.ttl = 86400s;
