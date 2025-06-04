@@ -56,7 +56,7 @@ sub wp {
 	if (req.url ~ "^/api/(v1|v2)/") {
 		return(pass);
 	}
-	if (req.url ~ "^/(nodeinfo|webfinger)" {
+	if (req.url ~ "^/(nodeinfo|webfinger)") {
 		return(pass);
 	}
 	
