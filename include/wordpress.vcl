@@ -11,11 +11,6 @@ sub wp {
                 return(pass);
         }
 
-	## .well-known should not be cached
-        if (req.url ~ "^/.well-known/") {
-                return(pass);
-        }
-
         ## Cache warmup
         # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
         # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
@@ -61,11 +56,21 @@ sub wp {
 	if (req.url ~ "^/api/(v1|v2)/") {
 		return(pass);
 	}
+	if (req.url ~ "^/(nodeinfo|webfinger)" {
+		return(pass);
+	}
+	
+	# .well-known API route should not be cached
+        if (req.url ~ "^/.well-known/") {
+                return(pass);
+        }
 
         # WordPress
-        if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/v2/" ) {
+        if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/" ) {
                 return(synth(403, "Unauthorized request"));
-        }
+        } else {
+		return(pass);
+	}
 
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
