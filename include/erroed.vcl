@@ -30,7 +30,13 @@ sub errorit {
 	## forbidden error 403
 	if (resp.status == 403) {
 		call debug_headers;
-		std.log("403 response: " + req.url + " IP=" + req.http.X-Real-IP);
+		#std.log("403 response: " + req.url + " IP=" + req.http.X-Real-IP);
+		std.log("403: ip=" + req.http.X-Real-IP +
+                        " host=" + req.http.host +
+			" url=" + req.url +
+			" ua=" + req.http.User-Agent +
+                        " match=" + req.http.X-Match +
+                        " asn=" + req.http.X-ASN);
 		set resp.status = 403;
 		set resp.http.Content-Type = "text/html; charset=utf-8";
 		set resp.http.Retry-After = "5";
