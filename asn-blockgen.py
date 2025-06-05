@@ -16,7 +16,8 @@ def generate_vcl(csv_path, output_path):
                 description = row["Requests"].strip()
                 block = f"""    if (req.http.X-ASN-ID == "{asn_id}") {{
         set req.http.X-Match = "asn-as{asn_id}";
-        return (synth(403, "Blocked ASN: {description} (AS{asn_id})"));
+        std.log("ASN ID match: " + req.http.X-ASN-ID + " IP: " + req.http.X-Real-IP + " country:" + req.http.X-Country-Code);
+        return (synth(466, "Blocked ASN: {description} (AS{asn_id})"));
     }}"""
                 blocks.append(block)
             blocks.append("}")  # sulkeva aaltosulje subille
