@@ -1,3 +1,7 @@
+/fix/
+/maint/
+/simple/
+/pwnd
 /wp-curriculo-vitae/
 /wp-db-backup/
 /wp-file-manager/

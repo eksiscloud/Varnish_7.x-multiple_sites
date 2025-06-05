@@ -201,6 +201,7 @@ sub bad_bot_detection {
 		# K
 #		|| req.http.User-Agent ~ "Kik"
 		|| req.http.User-Agent ~ "Kinza"
+		|| req.http.User-Agent ~ "Knoppix"
 		|| req.http.User-Agent ~ "KOCMOHABT"
 		|| req.http.User-Agent ~ "Kraphio"
 		|| req.http.User-Agent ~ "Kryptos"
@@ -354,6 +355,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "SeznamBot"
 		|| req.http.User-Agent ~ "Sidetrade"
 		|| req.http.User-Agent ~ "SimplePie"
+		|| req.http.User-Agent ~ "SirdataBot"
 		|| req.http.User-Agent ~ "SiteBot"
 		|| req.http.User-Agent ~ "Slack-ImgProxy"
 		|| req.http.User-Agent ~ "Slurp"

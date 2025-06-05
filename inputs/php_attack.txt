@@ -1,4 +1,5 @@
 ^/1337.php
+/autoload_classmap.php
 phpMyAdmin
 ^/phpmyadmin/.*$
 /themes/loader.php
@@ -56,7 +57,9 @@ phpMyAdmin
 /serverinfo.pho
 ^/srx.php
 ^/style.php
+/uploaded_script.php
 ^/url.php
+/worksec.php
 /wordpress/wp-login.php
 /wordpress/xmlrpc.php
 /wp-content/wp2.php
