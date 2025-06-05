@@ -20,7 +20,7 @@ sub asn_name {
 	# M247 is really bad apple. I want to know how many times it is involved
 	if (req.http.X-ASN ~ "(?i)m247|ipxo|drh" || req.http.X-ASN ~ "AS9009") {
 		set req.http.X-Match = "asn-m247-variant";
-		return(synth(403, "Blocked: ASN M247"));
+		return(synth(466, "Blocked: ASN M247"));
 	}
 
 	# Actual filtering
@@ -55,7 +55,7 @@ sub asn_name {
 		) {
 			if (req.url !~ "/wp-login") {
 				std.log("stopped ASN: " + req.http.x-asn);
-				return(synth(666, "Forbidden organization: " + std.toupper(req.http.x-asn)));
+				return(synth(466, "Forbidden organization: " + std.toupper(req.http.x-asn)));
 			} else {
 				std.log("banned ASN: " + req.http.x-asn);
 				return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
@@ -91,7 +91,7 @@ sub asn_name {
 		|| req.http.x-asn ~ "wellnet"				# xWEBltd, NL is really RU
 		) {
 			std.log("banned ASN: " + req.http.x-asn);
-			return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
+			return(synth(466, "Severe security issues: " + std.toupper(req.http.x-asn)));
 		}
 
 	## If you reach this point, you are propably a good guy, so let's remove ASN. It isn't needed anymore.
