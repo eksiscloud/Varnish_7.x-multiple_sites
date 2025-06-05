@@ -12,10 +12,16 @@ sub asn_name {
 	# but everyone here is knocking too often so I'll keep doors closed
 
 	# ASN can be empty sometimes. i stop those request, because it is suspicious
-	#if (!req.http.X-ASN || req.http.X-ASN == "unknown") {
-	#	std.log("Missing ASN info for: " + req.http.X-Real-IP);
-	#	return(synth(400, "Missing ASN"));
-	#}
+	if (req.http.X-ASN == "unknown") {
+		std.log("Missing ASN info for: " + req.http.X-Real-IP);
+		return(synth(400, "Missing ASN"));
+	}
+
+	# M247 is really bad apple. I want to know how many times it is involved
+	if (req.http.X-ASN ~ "(?i)m247|ipxo|drh" || req.http.X-ASN ~ "AS9009") {
+		set req.http.X-Match = "asn-m247-variant";
+		return(synth(403, "Blocked: ASN M247"));
+	}
 
 	# Actual filtering
 	if (

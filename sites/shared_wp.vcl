@@ -23,7 +23,7 @@ import cookie;		# Load the cookie, former libvmod-cookie
 import purge;		# Soft/hard purge by Varnish 7.x
 
 # from geoip package, needs separate compiling per Varnish version
-import geoip2;		# Load the GeoIP2 by MaxMind
+#import geoip2;		# Load the GeoIP2 by MaxMind
 
 # from apt install varnish-modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
@@ -114,6 +114,8 @@ include "/etc/varnish/ext/match_wp_attack.vcl";
 
 # Block using ASN
 include "/etc/varnish/ext/asn.vcl";
+include "/etc/varnish/ext/asn_blocklist_start.vcl";
+include "/etc/varnish/ext/asn_blocklist.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
@@ -265,7 +267,8 @@ sub vcl_recv {
 
 	## Forbidden means forbidden
 	# Nginx deals with countries and user-agents, but one is left: ASN
-	call asn_name;
+	#call asn_name;
+	call asn_blocklist_start;
 
 	## Few small things before we start working
 	call clean_up;
