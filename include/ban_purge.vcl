@@ -9,10 +9,10 @@ sub oblivion {
 		if (req.method == "PURGE") {
         
 			# Using  X-Cache-Tags header
-			if (req.http.xkey-purge) {
-				ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
-				return(synth(200, "Purged cache-tag: " + req.http.xkey-purge));
-			}
+#			if (req.http.xkey-purge) {
+#				ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
+#				return(synth(200, "Purged cache-tag: " + req.http.xkey-purge));
+#			}
 
 			# Example: audio/images using url
 			if (req.url ~ "^/wp-content/uploads/audio/" || req.url ~ "^/wp-content/uploads/images/") {

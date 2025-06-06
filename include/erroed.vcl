@@ -239,11 +239,11 @@ sub errorit {
 	#	set resp.reason = "Purged by xkey";
 	#}
 
-	if (req.method == "PURGE" && resp.reason == "Purging with xkey") {
-		ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
-		set resp.http.Xkey-Purged = req.http.xkey-purge;
-		return (deliver);
-	}
+#	if (req.method == "PURGE" && resp.reason == "Purging with xkey") {
+#		ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
+#		set resp.http.Xkey-Purged = req.http.xkey-purge;
+#		return (deliver);
+#	}
 
 	## all other errors if any
 	set resp.http.Content-Type = "text/html; charset=utf-8";

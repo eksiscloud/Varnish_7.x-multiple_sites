@@ -23,12 +23,12 @@ import cookie;		# Load the cookie, former libvmod-cookie
 import purge;		# Soft/hard purge by Varnish 7.x
 
 # from geoip package, needs separate compiling per Varnish version
-import geoip2;		# Load the GeoIP2 by MaxMind
+#import geoip2;		# Load the GeoIP2 by MaxMind
 
 # from apt install varnish modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-import accept;		# Fix Accept-Language
+#import accept;		# Fix Accept-Language
 #import xkey;		# another way to ban
 
 # List of banned countries
@@ -118,13 +118,13 @@ acl forbidden {
 sub vcl_init {
 	
 	## GeoIP
-	new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
-	new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
-	new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
+	#new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
+	#new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
+	#new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
 	
 	## Accept-Language
 	## Diffent caching for languages. I don't have multilingual sites, though.
-	new lang = accept.rule("fi");
+	#new lang = accept.rule("fi");
 	#lang.add("sv");
 	#lang.add("en");
 	
@@ -159,8 +159,8 @@ sub vcl_recv {
 	## GeoIP-banning
 	# 1st: GeoIP and normalizing country codes to lower case, 
 	# because remembering to use capital letters is just too hard
-	set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
+	#set req.http.X-Country-Code = country.lookup("country/iso_code", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	#set req.http.X-Country-Code = std.tolower(req.http.X-Country-Code);
 	
 	# 2nd: Actual blocking: (earlier I did geo-blocking in iptables, but this is much easier way)
 	# I'll ban or stop a country only after several tries, it is not a decision made easily 
@@ -186,8 +186,8 @@ sub vcl_recv {
 
 	## I can block service provider too using geoip-VMOD.
 	# 1st: Finding out and normalizing ASN
-	set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	set req.http.x-asn = std.tolower(req.http.x-asn);
+	#set req.http.x-asn = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+	#set req.http.x-asn = std.tolower(req.http.x-asn);
 	
 	# 2nd: Actual blocking: (customers from these are knocking security holes etc. way too often)
 	# Finding out ASN from whois-data isn't so straight forwarded
@@ -268,7 +268,7 @@ sub vcl_recv {
 
 	## Normalizing language
 	# Everybody will get fi. Should I remove it totally?
-	set req.http.accept-language = lang.filter(req.http.accept-language);
+	#set req.http.accept-language = lang.filter(req.http.accept-language);
 
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
@@ -293,7 +293,7 @@ sub vcl_recv {
         # acting like low level ddos.
         # So I waste money and resources to give an error to them
         # ext/malicious_url.vcl
-        call malicious_url;
+        #call malicious_url;
 
 ###### That's it. I don't need more for this Woocommerce
         return(pipe);
@@ -632,7 +632,7 @@ sub vcl_hash {
 
 	## Caching per language, that's why we normalized this
 	# Because I don't have multilingual, everything goes under "fi"
-	hash_data(req.http.Accept-Language);
+	#hash_data(req.http.Accept-Language);
 
 	## Return of User-Agent, but without caching
 	# Now I can send User-Agent to backend for 404 logging etc.
@@ -667,11 +667,11 @@ sub vcl_hit {
 #		}
 	
 		## Soft purge: zero values do same as hard purge
-		set req.http.purged = purge.soft(
-			std.duration(req.http.ttl,0s),
-			std.duration(req.http.grace,120s),
-			std.duration(req.http.keep,0s)
-		);
+#		set req.http.purged = purge.soft(
+#			std.duration(req.http.ttl,0s),
+#			std.duration(req.http.grace,120s),
+#			std.duration(req.http.keep,0s)
+#		);
 	
 		if (req.http.purged == "0") {
 			return (synth(404));
@@ -709,11 +709,11 @@ sub vcl_miss {
 #               }
         
                 ## Soft purge: zero values do same as hard purge
-                set req.http.purged = purge.soft(
-                        std.duration(req.http.ttl,0s),
-                        std.duration(req.http.grace,120s),
-                        std.duration(req.http.keep,0s)
-                );
+#                set req.http.purged = purge.soft(
+#                        std.duration(req.http.ttl,0s),
+#                        std.duration(req.http.grace,120s),
+#                        std.duration(req.http.keep,0s)
+#                );
         
                 if (req.http.purged == "0") {
                         return (synth(404));
@@ -784,7 +784,7 @@ sub vcl_backend_response {
         unset beresp.http.Vary;
         
         # I normalize Accept-Language, so it can be in vary
-	set beresp.http.Vary = "Accept-Language";
+#	set beresp.http.Vary = "Accept-Language";
         
 	# Accept-Encoding could be in Vary, because it changes content
 	# But it is handled internally by Varnish.
@@ -934,13 +934,13 @@ sub vcl_deliver {
 	set resp.http.Your-Language = req.http.Accept-Language;
 
 	## Don't show funny stuff to bots
-	if (req.http.x-bot == "visitor") {
+#	if (req.http.x-bot == "visitor") {
 		# lookup can't be in sub vcl
-		set resp.http.Your-IP-Country = country.lookup("country/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0")) + "/" + std.toupper(req.http.X-Country-Code);
-		set resp.http.Your-IP-City = city.lookup("city/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-		set resp.http.Your-IP-GPS = city.lookup("location/latitude", std.ip(req.http.X-Real-IP, "0.0.0.0")) + " " + city.lookup("location/longitude", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-		set resp.http.Your-IP-ASN = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
-	}
+#		set resp.http.Your-IP-Country = country.lookup("country/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0")) + "/" + std.toupper(req.http.X-Country-Code);
+#		set resp.http.Your-IP-City = city.lookup("city/names/en", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+#		set resp.http.Your-IP-GPS = city.lookup("location/latitude", std.ip(req.http.X-Real-IP, "0.0.0.0")) + " " + city.lookup("location/longitude", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+#		set resp.http.Your-IP-ASN = asn.lookup("autonomous_system_organization", std.ip(req.http.X-Real-IP, "0.0.0.0"));
+#	}
 
 	# That's it
 }

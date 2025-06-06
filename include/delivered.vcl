@@ -30,7 +30,7 @@ sub deliverit {
 	set resp.http.Vary = resp.http.Vary + ",Origin";
 
 	## Set xkey visible
-	if (resp.http.X-Cache-Tags) {
-	        set resp.http.X-Cache-Tags = resp.http.X-Cache-Tags;
-	}
+#	if (resp.http.X-Cache-Tags) {
+#	        set resp.http.X-Cache-Tags = resp.http.X-Cache-Tags;
+#	}
 }

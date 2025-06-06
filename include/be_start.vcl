@@ -31,9 +31,9 @@ sub be_started {
 	}
 	
 	## xkey for smarter PURGE
-	if (beresp.http.X-Cache-Tags) {
-		set beresp.http.xkey = beresp.http.X-Cache-Tags;
-	}
+#	if (beresp.http.X-Cache-Tags) {
+#		set beresp.http.xkey = beresp.http.X-Cache-Tags;
+#	}
 
 	## ESI is enabled and now in use if needed
 	# except... I didn't configured this on MISS
