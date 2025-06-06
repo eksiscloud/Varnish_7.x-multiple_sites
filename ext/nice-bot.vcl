@@ -258,6 +258,11 @@ sub cute_bot_allowance {
 		set req.http.User-Agent = "Newsify"; 
 		set req.http.x-user-agent = req.http.User-Agent;
 	}
+
+	## For logging
+	if (req.http.x-bot == "nice") {
+		std.log("BOT_DETECTED IP=" + req.http.X-Real-IP + " " + req.http.X-Country-Code + " User-Agent:" + req.http.User-Agent);
+	}
 	
 	# That's it, folk
 }
