@@ -13,7 +13,7 @@ sub asn_name {
 
 	# ASN can be empty sometimes. i stop those request, because it is suspicious
 	if (req.http.X-ASN == "unknown") {
-		std.log("Missing ASN info for: " + req.http.X-Real-IP);
+		std.log("Missing ASN_FAIL: " + req.http.X-Real-IP + " " + req.http.X-Country-Code + " " + req.http.User-Agent);
 		return(synth(400, "Missing ASN"));
 	}
 
@@ -54,10 +54,10 @@ sub asn_name {
 		|| req.http.x-asn == "wii"				# Wholesale Internet, Inc US
 		) {
 			if (req.url !~ "/wp-login") {
-				std.log("stopped ASN: " + req.http.x-asn);
+				std.log("stopped ASN: " + req.http.x-asn + req.http.X-Real-IP + " " + req.http.X-Country-Code + " " + req.http.User-Agent);
 				return(synth(466, "Forbidden organization: " + std.toupper(req.http.x-asn)));
 			} else {
-				std.log("banned ASN: " + req.http.x-asn);
+				std.log("banned ASN: " + req.http.x-asn + req.http.X-Real-IP + " " + req.http.X-Country-Code + " " + req.http.User-Agent);
 				return(synth(423, "Severe security issues: " + std.toupper(req.http.x-asn)));
 			}
 		}
@@ -90,7 +90,7 @@ sub asn_name {
 		|| req.http.x-asn ~ "velianet"				# velia.net Internetdienste GmbH, FR is actually RU
 		|| req.http.x-asn ~ "wellnet"				# xWEBltd, NL is really RU
 		) {
-			std.log("banned ASN: " + req.http.x-asn);
+			std.log("banned ASN: " + req.http.x-asn + req.http.X-Real-IP + " " + req.http.X-Country-Code + " " + req.http.User-Agent);
 			return(synth(466, "Severe security issues: " + std.toupper(req.http.x-asn)));
 		}
 
