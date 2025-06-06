@@ -18,8 +18,8 @@ sub asn_blocklist_start {
         }
 
 	# Let`s filtering
-	call asn_blocklist;
 	call asn_name;
+	call asn_blocklist;
 
 # The sub stops here
 }
