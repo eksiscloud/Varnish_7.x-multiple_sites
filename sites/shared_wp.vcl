@@ -114,6 +114,7 @@ include "/etc/varnish/ext/match_wp_attack.vcl";
 
 # Block using ASN
 include "/etc/varnish/ext/asn_blocklist_start.vcl";
+include "/etc/varnish/ext/asn.vcl";
 include "/etc/varnish/ext/asn_blocklist.vcl";
 
 # Human's user agent
