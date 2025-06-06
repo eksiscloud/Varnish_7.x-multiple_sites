@@ -10,7 +10,7 @@ cmd = [
     "-g", "request",
     "-q", 'VCL_Log ~ "BOT_DETECTED"',
     "-n", "default",  # Vaihda jos eri nimi
-    "-d", "-t", "600"   # Kerää 60 sekunnin ajan
+    "-d", "-t", "1800"   # Kerää 60 sekunnin ajan
 ]
 
 print("Analysoidaan BOT_DETECTED-pyyntöjä asetusten ajan mukaan...")
