@@ -173,16 +173,6 @@ backend emergency_nginx {
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
 # Heads up! ACL must be in use, if uncommented.
  
-# This can do almost everything
-acl whitelist {
-	"localhost";
-	"127.0.0.1";
-	"157.180.74.208";
-	"37.27.18.60";
-	"37.27.188.104";
-	"85.76.112.42";
-}
-
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
@@ -196,18 +186,7 @@ acl forbidden {
 # You have to define server at backend definition too.
 
 sub vcl_init {
-	
-	## GeoIP
-	#new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
-	#new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
-	#new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
-	
-	## Accept-Language
-	## Diffent caching for languages. I don't have multilingual sites, though.
-	#new lang = accept.rule("fi");
-	#lang.add("sv");
-	#lang.add("en");
-	
+		
 # The end of init
 }
 

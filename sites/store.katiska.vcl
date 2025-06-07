@@ -95,14 +95,6 @@ backend sites {
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
  
-# This can do almost everything
-#acl whitelist {
-#	"localhost";
-#	"127.0.0.1";
-#	"157.180.74.208";
-#	"85.76.80.163";
-#}
-
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
