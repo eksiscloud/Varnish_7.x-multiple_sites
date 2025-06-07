@@ -5,7 +5,7 @@ sub user_agents {
 	## x-bot and x-user-agent
 
 	## These should be marked as real users, but some aren't
-	call real_users.vcl;
+	call real_users;
 
 
 # That's all folk
