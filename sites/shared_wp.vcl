@@ -4,9 +4,9 @@
 ## Heads up! There is errors for sure
 ## I'm just another copypaster
 ##
-## Varnish 7.1.1 default.vcl for multiple virtual hosts
+## Varnish 7.7.1 default.vcl for multiple virtual hosts
 ## 
-## default.vcl is splitted in several sub vcls. That make updates much more easier
+## default.vcl is splitted in several sub vcls. Those use includes.  That make updating much more easier
 ##
 ## This works as a standalone VCL for one WordPress host too
 ##  
@@ -33,16 +33,25 @@ import xkey;		# another way to ban
 
 ## includes are normally in vcl
 # www-domains need normalizing
-include "/etc/varnish/include/normalize_host.vcl";
+include "/etc/varnish/include/recv/1-normalize_host.vcl";
+
+# Block using ASN
+include "/etc/varnish/include/recv/2-asn_blocklist_start.vcl";
+include "/etc/varnish/include/recv/2-1-asn_id.vcl";
+include "/etc/varnish/include/recv/2-2-asn_blocklist.vcl";
+
+# Let's cleanup first reseting headers etc., lightly
+include "/etc/varnish/include/recv/3-clean_up.vcl";
+
+# Pure normalizing and similar, normally done first
+include "/etc/varnish/include/recv/4-normalize.vcl";
+
+# Cleaning user-agents
+include "/etc/varnish/include/recv/5-user_agents.vcl";
+include "/etc/varnish/include/recv/5-1-real_users.vcl";
 
 # Debugging 403 errors
 include "/etc/varnish/include/debug_headers.vcl";
-
-# Let's cleanup first, lightlu
-include "/etc/varnish/include/clean_up.vcl";
-
-# Pure normalizing and similar, normally done first
-include "/etc/varnish/include/normalize.vcl";
 
 # Is there ban or purge, and who can do it
 include "/etc/varnish/include/ban_purge.vcl";
@@ -111,11 +120,6 @@ include "/etc/varnish/ext/match_other_attack.vcl";
 include "/etc/varnish/ext/match_php_attack.vcl";
 include "/etc/varnish/ext/match_sql_attack.vcl";
 include "/etc/varnish/ext/match_wp_attack.vcl";
-
-# Block using ASN
-include "/etc/varnish/ext/asn_blocklist_start.vcl";
-include "/etc/varnish/ext/asn.vcl";
-include "/etc/varnish/ext/asn_blocklist.vcl";
 
 # Human's user agent
 include "/etc/varnish/ext/user-ua.vcl";
@@ -233,7 +237,7 @@ sub vcl_recv {
 	## If the backend is done, we change to emergency mode
 	if (!std.healthy(sites)) {
 		set req.backend_hint = emergency_nginx;
-		return (pipe);
+		return(pipe);
 	}
 
 	## All normal and we use this backend
@@ -243,13 +247,11 @@ sub vcl_recv {
 	# only for www-domains
 	call normalize_host;
 
-        ## just for this virtual host
+        ## just for these virtual hosts
         # for stop caching uncomment
         #return(pass);
         # for dumb TCL-proxy uncomment
         #return(pipe);
-
-	### The work starts here
 
 	## certbot gets bypass route
 	if (req.http.User-Agent ~ "certbot") {
@@ -257,38 +259,20 @@ sub vcl_recv {
 		return(pipe);
 	}
 
-	## Give 127.0.0.1 to X-Real-IP if curl is used from localhost
-	# (std.ip(req.http.X-Real-IP, "0.0.0.0") goes to fallbck when curl is used from localhost and fails
-	# Because Nginx acts as a reverse oroxy, client.ip is always its IP.
-	# Now we get some IP when worked from home shell
-	if (!req.http.X-Real-IP || req.http.X-Real-IP == "") {
-		set req.http.X-Real-IP = client.ip;
-	}
+	### The work starts here
 
 	## Forbidden means forbidden
 	# Nginx deals with countries and user-agents, but one is left: ASN
-	#call asn_name;
 	call asn_blocklist_start;
 
-	## Few small things before we start working
+	## Few small things as reseting headers  before we start working
 	call clean_up;
 
-	## Redirecting http/80 to https/443
-        # This could, and perhaps should, do in Nginx, but certbot likes this better
-        if ((req.http.X-Forwarded-Proto && req.http.X-Forwarded-Proto != "https") ||
-        (req.http.Scheme && req.http.Scheme != "https")) {
-                return(synth(750));
-        }
-
-	### Here we move into sub-world
-
-	## Normalizin, part 1
+	## Normalizing, part 1
 	call set_normalizing;
 
-	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
-        # These should be real users, but some aren't
-        # ext/user-ua.vcl
-        call real_users;
+	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
+        call user_agents;
 	
 	# Technical probes, so normalize UA using probes.vcl
 	# These are useful and I want to know if backend is working etc.
