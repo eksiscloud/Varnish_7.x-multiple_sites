@@ -32,25 +32,25 @@ import purge;		# Soft/hard purge by Varnish 7.x
 #import xkey;		# another way to ban
 
 # List of banned countries
-include "/etc/varnish/ext/ban-countries.vcl";
+#include "/etc/varnish/ext/ban-countries.vcl";
 
 # Banning by ASN (uses geoip-VMOD)
-include "/etc/varnish/ext/asn.vcl";
+#include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
-include "/etc/varnish/ext/user-ua.vcl";
+#include "/etc/varnish/ext/user-ua.vcl";
 
 # Tools and libraries
-include "/etc/varnish/ext/probes.vcl";
+#include "/etc/varnish/ext/probes.vcl";
 
 # Bots with purpose
-include "/etc/varnish/ext/nice-bot.vcl";
+#include "/etc/varnish/ext/nice-bot.vcl";
 
 # Manipulating some urls
-include "/etc/varnish/ext/manipulate.vcl";
+#include "/etc/varnish/ext/manipulate.vcl";
 
 # Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 #include "/etc/varnish/ext/cors.vcl";
@@ -96,20 +96,20 @@ backend sites {
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
  
 # This can do almost everything
-acl whitelist {
-	"localhost";
-	"127.0.0.1";
-	"157.180.74.208";
-	"85.76.80.163";
-}
+#acl whitelist {
+#	"localhost";
+#	"127.0.0.1";
+#	"157.180.74.208";
+#	"85.76.80.163";
+#}
 
 # All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
 # These are mostly API-services that make theirs business passing the origin service.
 # Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
 # Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-acl forbidden {
-	"printfriendly.com";
-}
+#acl forbidden {
+#	"printfriendly.com";
+#}
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -145,7 +145,7 @@ sub vcl_recv {
 	# for stop caching uncomment
 	#return(pass);
 	# for dumb TCL-proxy uncomment
-	#return(pipe);
+	return(pipe);
 	
 
 	### The work starts here
@@ -168,7 +168,7 @@ sub vcl_recv {
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
 	# like from Turkey to Finland via Senegal
 	# For easier updating of the list ext/ban-countries.vcl
-        call close_doors;
+        #call close_doors;
 
         if (req.http.x-ban-country) {
                 std.log("banned country: " + std.toupper(req.http.x-ban-country));
@@ -195,7 +195,7 @@ sub vcl_recv {
 	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
 	# I need this for trash, that are coming from countries I can't ban.
 	# ext/filtering/asn.vcl
-	call asn_name;
+	#call asn_name;
 
 	## Redirecting http/80 to https/443
         ## This could, and perhaps should, do on Nginx but certbot likes this better
@@ -273,19 +273,19 @@ sub vcl_recv {
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
         # ext/filtering/user-ua.vcl
-        call real_users;
+        #call real_users;
 	
 	# Technical probes, so normalize UA using probes.vcl
 	# These are useful and I want to know if backend is working etc.
 	# ext/filtering/probes.vcl
 	if (req.http.x-bot != "visitor") {
-		call tech_things;
+	#	call tech_things;
 	}
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/filtering/nice-bot.vcl
 	if (req.http.x-bot !~ "(visitor|tech)") {
-		call cute_bot_allowance;
+	#	call cute_bot_allowance;
 	}
 
 	# Huge list of urls and pages that are constantly knocked
@@ -332,7 +332,7 @@ sub vcl_recv {
 		
 	## URL changes by ext/redirect/manipulate.vcl, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
-		call new_direction;
+#		call new_direction;
 	}
 	
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
@@ -347,10 +347,10 @@ sub vcl_recv {
 	## Who can do BAN, PURGE and REFRESH and how
 	# Remember to use capitals when doing, size matters...
 	
-	if (req.method == "BAN|PURGE|REFRESH") {
-               if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
-                       return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
-		}
+#	if (req.method == "BAN|PURGE|REFRESH") {
+#               if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+#                       return (synth(405, "Banning/purging not allowed for " + req.http.X-Real-IP));
+#		}
 		
 		# BAN needs a pattern:
 		# curl -X BAN -H "X-Ban-Request:^/contact" "www.example.com"
@@ -385,7 +385,7 @@ sub vcl_recv {
 			set req.method = "GET";
 			set req.hash_always_miss = true;
 		}
-	}
+#	}
 	
 	# This just an example how to ban objects or purge all when country codes come from backend
 	#if (req.method == "PURGE") {
@@ -451,9 +451,9 @@ sub vcl_recv {
 	## Enable smart refreshing, aka. ctrl+F5 will flush that page
 	# Remember your header Cache-Control must be set something else than no-cache
 	# Otherwise everything will miss
-	if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
-		set req.hash_always_miss = true;
-	}
+	#if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
+	#	set req.hash_always_miss = true;
+	#}
 	
 	## Page that Monit will ping
 	# Change this URL to something that will NEVER be a real URL for the hosted site, it will be effectively inaccessible.
@@ -777,7 +777,7 @@ sub vcl_backend_response {
 	}
 
 	## How long Varnish will keep objects is guided by ext/cache-ttl.vcl
-	call time_to_go;
+	#call time_to_go;
 	
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
