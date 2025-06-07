@@ -109,9 +109,6 @@ include "/etc/varnish/ext/match_php_attack.vcl";
 include "/etc/varnish/ext/match_sql_attack.vcl";
 include "/etc/varnish/ext/match_wp_attack.vcl";
 
-# Human's user agent
-include "/etc/varnish/ext/user-ua.vcl";
-
 # Tools and libraries
 include "/etc/varnish/ext/probes.vcl";
 
