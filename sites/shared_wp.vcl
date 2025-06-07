@@ -45,7 +45,7 @@ include "/etc/varnish/include/recv/5-1-real_users.vcl";
 include "/etc/varnish/include/debug_headers.vcl";
 
 # Is there ban or purge, and who can do it
-include "/etc/varnish/include/ban_purge.vcl";
+include "/etc/varnish/include/recv/ban_purge.vcl";
 
 # Something must do before cookies are cleaned
 include "/etc/varnish/include/pre-wordpress.vcl";
@@ -172,14 +172,7 @@ backend emergency_nginx {
 ## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
 # Heads up! ACL must be in use, if uncommented.
- 
-# All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
-# These are mostly API-services that make theirs business passing the origin service.
-# Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
-# Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-acl forbidden {
-	"printfriendly.com";
-}
+
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -272,8 +265,7 @@ sub vcl_recv {
 	}
 	
 	## Ban & Purge
-	# include/ban_purge.vcl
-	call oblivion;
+	call ban_purge;
 	
 	## Setup CORS
 	# ext/cors.vcl
