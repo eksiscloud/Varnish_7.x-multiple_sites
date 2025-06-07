@@ -254,7 +254,7 @@ sub vcl_recv {
 	call clean_up;
 
 	## Normalizing, part 1
-	call set_normalizing;
+	call normalize;
 
 	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
         call user_agents;
