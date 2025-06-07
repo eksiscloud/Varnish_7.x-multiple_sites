@@ -22,15 +22,6 @@ import std;		# Load the std, not STD for god sake
 import cookie;		# Load the cookie, former libvmod-cookie
 import purge;		# Soft/hard purge by Varnish 7.x
 
-# from geoip package, needs separate compiling per Varnish version
-#import geoip2;		# Load the GeoIP2 by MaxMind
-
-# from apt install varnish-modules but it needs same Varnish version that repo is delivering
-# I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
-# So I gave up with newer ones.
-#import accept;		# Fix Accept-Language
-import xkey;		# another way to ban
-
 ## includes are normally in vcl
 # www-domains need normalizing
 include "/etc/varnish/include/recv/1-normalize_host.vcl";
@@ -94,9 +85,6 @@ include "/etc/varnish/include/be_ttl.vcl";
 
 # vcl_backend_response, part III
 include "/etc/varnish/include/be_end.vcl";
-
-# vcl_backend_response, pat IV, xkey
-include "/etc/varnish/include/x-key.vcl";
 
 # vcl_deliver, part I
 include "/etc/varnish/include/delivered.vcl";
@@ -420,9 +408,6 @@ sub vcl_backend_response {
 	## Third part
 	# include/be_end.vcl
 	call be_ended;
-
-	## Fourh part, xkey
-	call ban-tags;
 
 	## We are at the end
 }

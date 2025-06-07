@@ -29,8 +29,5 @@ sub deliverit {
 	## Origin should send to browser
 	set resp.http.Vary = resp.http.Vary + ",Origin";
 
-	## Set xkey visible
-#	if (resp.http.X-Cache-Tags) {
-#	        set resp.http.X-Cache-Tags = resp.http.X-Cache-Tags;
-#	}
+# This is the end
 }
