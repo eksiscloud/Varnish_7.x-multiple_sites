@@ -341,8 +341,8 @@ sub vcl_recv {
 
 	## Everything what a WordPress needs
 	# include/wordpress.vcl
-	#call wp;
-	call wordpress_debug;
+	call wp;
+	#call wordpress_debug;
 
 	## Last things to set up
 	# include/last_ones.vcl

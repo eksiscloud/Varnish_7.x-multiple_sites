@@ -31,12 +31,12 @@ for site in "${sites[@]}"; do
     vclname="${site}_${timestamp}"
     echo "==> Update $site → $vclname"
 
-    if varnishadm vcl.load "$vclname" "$vclfile"; then
-        varnishadm vcl.label "$site" "$vclname"
+    if varnishadm -n varnishd vcl.load "$vclname" "$vclfile"; then
+        varnishadm -n varnishd vcl.label "$site" "$vclname"
         echo "✓ Label has set: $site → $vclname"
     else
         echo "✗ ERROR: VCL loading failed for $site"
     fi
 done
 
-echo "✅ All is ready. Checkout the status: varnishadm vcl.list"
+echo "✅ All is ready. Checkout the status: varnishadm -n /dev/shm/varnish vcl.list"
