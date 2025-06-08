@@ -22,12 +22,10 @@ import std;		# Load the std, not STD for god sake
 import cookie;		# Load the cookie, former libvmod-cookie
 import purge;		# Soft/hard purge by Varnish 7.x
 
-# from apt install varnish-modules but it needs same Varnish version that repo is delivering
-# I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
-# So I gave up with newer ones.
+# From combiled varnish-modules
 import xkey;		# another way to ban
 
-## includes are normally in vcl
+## Includes are normally in vcl
 # www-domains need normalizing
 include "/etc/varnish/include/recv/1-normalize_host.vcl";
 
@@ -167,7 +165,8 @@ backend emergency_nginx {
 
 ## About IPs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0")
-
+# For IP whitelisting I have X-Bypass header by Nginx and then I can do this:
+# req.http.X-Bypass != "true"
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -227,14 +226,13 @@ sub vcl_recv {
 	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
         call 5-user_agents;
 		
-	# Huge list of urls and pages that are constantly knocked
-	# There is no one to listening, and it isn't creating any load, but those are still hammering backend
+	## Huge list of urls and pages that are constantly knocked
+	# There is no one to listening, but those are still hammering backend
 	# acting like low level ddos.
 	# So I waste money and resources to give an error to them
-	# ext/malicious_url.vcl
 	call 6-malicious_url;
 
-	# If a user agent isn't identified as user or a bot, its type is unknown.
+	## If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
 	# There is big chance it is bot/scraper, but we have false identifications anyway. 
 	if (!req.http.x-user-agent) {
@@ -242,14 +240,14 @@ sub vcl_recv {
 		set req.http.x-bot = "visitor";
         }
 		
-	## URL changes by ext/manipulate.vcl, mostly fixed search strings
+	## URL changes, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
-		call new_direction;
+		call 7-manipulate;
 	}
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	call oblivion;
+	call ban_purge;
 	
 	## Setup CORS
 	# ext/cors.vcl
