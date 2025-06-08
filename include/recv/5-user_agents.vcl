@@ -1,4 +1,4 @@
-sub user_agents {
+sub user-agents {
 
 	### Central station for tidying user-agents.
 	## I could normalize UA, but nowadays I leave is as it is, and adding two x-headers:
@@ -15,7 +15,7 @@ sub user_agents {
 
         ## These are nice bots, and I'm normalizing UA a bit
         if (req.http.x-bot !~ "(visitor|tech)$") {
-                call cute_bot_allowance;
+                call nice-bots;
         }
 
 # That's all folk
