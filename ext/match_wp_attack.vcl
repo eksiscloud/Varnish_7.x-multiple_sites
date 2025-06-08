@@ -1,9 +1,0 @@
-sub match_wp_attack {
-    if (req.url ~ "(/fix/|/maint/|/simple/|/pwnd|/wp\-curriculo\-vitae/|/wp\-db\-backup/|/wp\-file\-manager/|/wp\-hotel\-booking/|/wp\-user\-avatar/|/\.wp-admin.php|/wp\-admin/asd\.php|/wp\-admin/css/Marvins\.php|/wp\-admin/images/uni\.php|/wp\-admin/network/|/wp\-admin/upload_index\.php|/wp\-admin/user/back\-up\.php|/wp\-admin/user/wp\-select\.php|/wp\-admin/wp\-signups\.php|/wp\-includes/blocks/content\-po\.php|/wp\-includes/customize/class\-wp\-customize\-background\-image\-setting\-ajax\.php|/wp\-includes/Requests/IPv4\.php|/wp\-includes/Requests/IRI\-meta\.php|/wp\-includes/sodium_compat/namespaced/Core/Curve25519/GeP4\.php|/wp\-includes/js/crop/locales\.php|/wp\-includes/js/jcrop/Jcrop\.php|/wp\-includes/Text/Diff/Renderer/ma\.php|/wp\-includes/theme\-compat/back\-up\.php|/wp\-includes/js/thickbox/preview\.php|/wp\-includes/wlwmanifest\.xml|/\.wp-content.php|/wp\-content/bees\.php|/wp\-content/force\-download\.php|/wp\-content/plugins/wp\-types\.php|/wp\-content/themes/wp\-update\.php|/wp\-content/uploads/file\-manager/|/wp\-content/wp2\.php|/\.wp-config.php|/wp\-config\-backup|/wp-config.php[1-9]|/wp-config[1-9]|/wp-config.[1-9]|/wp-config[1-9].txt|/wp\-config\.php\.backup|/wp\-config\-save|/wp\-configuration\.php_orig|/wp\-configuration\.php_original|/wp\-strongs|/wp\-admin/install\.php)") {
-        if (req.http.X-Country-Code ~ "fi" || req.http.X-Accept-Language ~ "fi") {
-            return (synth(403, "Forbidden"));
-        } else {
-            return (synth(666, "Security issue"));
-        }
-    }
-}
