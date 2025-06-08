@@ -198,7 +198,7 @@ sub vcl_recv {
 
 	## Normalize hostname to avoid double caching
 	# only for www-domains
-	call normalize_host;
+	call 1-normalize_host;
 
         ## just for these virtual hosts
         # for stop caching uncomment
@@ -216,23 +216,23 @@ sub vcl_recv {
 
 	## Forbidden means forbidden
 	# Nginx deals with countries and user-agents, but one is left: ASN
-	call asn_blocklist_start;
+	call 2-asn_blocklist_start;
 
 	## Few small things as reseting headers  before we start working
-	call clean_up;
+	call 3-clean_up;
 
 	## Normalizing, part 1
-	call set_normalizing;
+	call 4-normalizing;
 
 	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
-        call user_agents;
+        call 5-user_agents;
 		
 	# Huge list of urls and pages that are constantly knocked
 	# There is no one to listening, and it isn't creating any load, but those are still hammering backend
 	# acting like low level ddos.
 	# So I waste money and resources to give an error to them
 	# ext/malicious_url.vcl
-	call malicious_url;
+	call 6-malicious_url;
 
 	# If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 

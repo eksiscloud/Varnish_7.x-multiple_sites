@@ -14,7 +14,7 @@ sub asn_blocklist_start {
         }
 
 	# Let`s filtering
-	call asn_id;
+	call 2-1-asn_id;
 	call asn_blocklist;
 
 # The sub stops here

@@ -1,4 +1,4 @@
-sub malicious_url {
+sub 6-malicious_url {
 
 	# Every match_* -sub, same idea, different classificatiom
 	call match_wp_attack;

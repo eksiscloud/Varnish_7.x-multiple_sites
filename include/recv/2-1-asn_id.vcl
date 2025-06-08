@@ -1,4 +1,4 @@
-sub asn_id {
+sub 2-1-asn_id {
 
 	## If you have just another website for real users maybe It is wise move to ban every single one VPS service
 	## you don't need for APIs etc.

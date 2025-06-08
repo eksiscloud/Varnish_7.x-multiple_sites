@@ -1,4 +1,4 @@
-sub probes {
+sub 5-2-probes {
 
 	## Local ones
 	if (req.http.User-Agent ~ "Matomo") {
