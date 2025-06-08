@@ -46,11 +46,16 @@ include "/etc/varnish/include/recv/4-normalize.vcl";
 include "/etc/varnish/include/recv/5-user_agents.vcl";
 include "/etc/varnish/include/recv/5-1-real_users.vcl";
 include "/etc/varnish/include/recv/5-2-probes.vcl";
+include "/etc/varnish/include/recv/5-3-nice-bot.vcl";
 
-# Bots with purpose
-include "/etc/varnish/ext/nice-bot.vcl";
-# Debugging 403 errors
-include "/etc/varnish/include/debug_headers.vcl";
+# Kill useless knockers
+include "/etc/varnish/include/recv/6-malicious_url.vcl";
+include "/etc/varnish/include/recv/match_config_attack.vcl";
+include "/etc/varnish/include/recv/match_env_attack.vcl";
+include "/etc/varnish/include/recv/match_other_attack.vcl";
+include "/etc/varnish/include/recv/match_php_attack.vcl";
+include "/etc/varnish/include/recv/match_sql_attack.vcl";
+include "/etc/varnish/include/recv/match_wp_attack.vcl";
 
 # Is there ban or purge, and who can do it
 include "/etc/varnish/include/ban_purge.vcl";
@@ -110,24 +115,6 @@ include "/etc/varnish/include/showed.vcl";
 include "/etc/varnish/include/erroed.vcl";
 
 ## ext are something extra
-# Kill useless knockers
-#include "/etc/varnish/ext/403.vcl";
-include "/etc/varnish/ext/malicious_url.vcl";
-include "/etc/varnish/ext/match_config_attack.vcl";
-include "/etc/varnish/ext/match_env_attack.vcl";
-include "/etc/varnish/ext/match_other_attack.vcl";
-include "/etc/varnish/ext/match_php_attack.vcl";
-include "/etc/varnish/ext/match_sql_attack.vcl";
-include "/etc/varnish/ext/match_wp_attack.vcl";
-
-# Human's user agent
-include "/etc/varnish/ext/user-ua.vcl";
-
-# Tools and libraries
-include "/etc/varnish/ext/probes.vcl";
-
-# Bots with purpose
-include "/etc/varnish/ext/nice-bot.vcl";
 
 # Manipulating some urls
 include "/etc/varnish/ext/manipulate.vcl";
