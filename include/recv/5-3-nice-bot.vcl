@@ -1,4 +1,4 @@
-sub cute-bot {
+sub nice-bot {
 
 	## Useful bots, spiders etc.
 	# I'm using x-bot somekind of ACL
