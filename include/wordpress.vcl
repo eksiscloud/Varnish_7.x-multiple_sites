@@ -66,12 +66,12 @@ sub wp {
         }
 
         # WordPress
-        if (!req.http.Cookie ~ "wordpress_logged_in" && req.url ~ "/wp-json/wp/" ) {
-                return(synth(403, "Unauthorized request"));
-        } else {
-		return(pass);
-	}
-
+	if (req.url ~ "/wp-json/wp/") {
+    if (req.http.Cookie ~ "wordpress_logged_in") {
+        return(pass);
+    }
+    return(synth(403, "Unauthorized request"));
+}
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
