@@ -22,13 +22,9 @@ import std;		# Load the std, not STD for god sake
 import cookie;		# Load the cookie, former libvmod-cookie
 import purge;		# Soft/hard purge by Varnish 7.x
 
-# from geoip package, needs separate compiling per Varnish version
-#import geoip2;		# Load the GeoIP2 by MaxMind
-
 # from apt install varnish-modules but it needs same Varnish version that repo is delivering
 # I compiled, but it was still claiming Varnish was in apt-given version, even it was newer.
 # So I gave up with newer ones.
-#import accept;		# Fix Accept-Language
 import xkey;		# another way to ban
 
 ## includes are normally in vcl
@@ -49,7 +45,10 @@ include "/etc/varnish/include/recv/4-normalize.vcl";
 # Cleaning user-agents
 include "/etc/varnish/include/recv/5-user_agents.vcl";
 include "/etc/varnish/include/recv/5-1-real_users.vcl";
+include "/etc/varnish/include/recv/5-2-probes.vcl";
 
+# Bots with purpose
+include "/etc/varnish/ext/nice-bot.vcl";
 # Debugging 403 errors
 include "/etc/varnish/include/debug_headers.vcl";
 
@@ -160,12 +159,6 @@ probe sondi {
 	.threshold = 3;
 }
 
-# Force to sick: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed sick
-# Force to healthy: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed healthy
-# Back to auto: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.set_health crashed auto
-# Check status: varnishadm -S /etc/varnish/secret -T localhost:6082 backend.list
-# Debug status: varnishadm -S /etc/varnish/secret -T localhost:6082 debug.health 
-
 ## Backend tells where a site can be found
 
 # WordPress
@@ -184,27 +177,10 @@ backend emergency_nginx {
 	.host = "127.0.0.1";
 	.port = "8283";
 }
-## ACLs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
-# Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist
-# Heads up! ACL must be in use, if uncommented.
- 
-# This can do almost everything
-acl whitelist {
-	"localhost";
-	"127.0.0.1";
-	"157.180.74.208";
-	"37.27.18.60";
-	"37.27.188.104";
-	"85.76.112.42";
-}
 
-# All of filtering isn't that easy to do using country, ISP, ASN or user agent. So let's use reverse DNS. Filtering is done at asn.vcl.
-# These are mostly API-services that make theirs business passing the origin service.
-# Quite many hate hot linking and frames because that is one kind of stealing. These, as SEO-sevices, do exacly same.
-# Reverse DNS is done only at starting Varnish, not when reloading. Same can be done using dig or similar and using IP/IPs here.
-acl forbidden {
-	"printfriendly.com";
-}
+## About IPs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
+# Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0")
+
 
 #################### vcl_init ##################
 # Called when VCL is loaded, before any requests pass through it. Typically used to initialize VMODs.
@@ -212,16 +188,6 @@ acl forbidden {
 
 sub vcl_init {
 	
-	## GeoIP
-	#new country = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-Country.mmdb");
-	#new city = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-City.mmdb");
-	#new asn = geoip2.geoip2("/usr/share/GeoIP/GeoLite2-ASN.mmdb");
-	
-	## Accept-Language
-	## Diffent caching for languages. I don't have multilingual sites, though.
-	#new lang = accept.rule("fi");
-	#lang.add("sv");
-	#lang.add("en");
 	
 # The end of init
 }
@@ -273,20 +239,7 @@ sub vcl_recv {
 
 	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
         call user_agents;
-	
-	# Technical probes, so normalize UA using probes.vcl
-	# These are useful and I want to know if backend is working etc.
-	# ext/probes.vcl
-	if (req.http.x-bot != "visitor") {
-		call tech_things;
-	} 
-
-	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
-	# ext/nice-bot.vcl
-	if (req.http.x-bot !~ "(visitor|tech)$") {
-		call cute_bot_allowance;
-	}
-	
+		
 	# Huge list of urls and pages that are constantly knocked
 	# There is no one to listening, and it isn't creating any load, but those are still hammering backend
 	# acting like low level ddos.

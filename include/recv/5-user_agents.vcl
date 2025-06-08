@@ -7,6 +7,16 @@ sub user_agents {
 	## These should be marked as real users, but some aren't
 	call real_users.vcl;
 
+	## Technical probes
+        # These are useful and I want to know if backend is working etc.
+        if (req.http.x-bot != "visitor") {
+                call probes;
+        } 
+
+        ## These are nice bots, and I'm normalizing UA a bit
+        if (req.http.x-bot !~ "(visitor|tech)$") {
+                call cute_bot_allowance;
+        }
 
 # That's all folk
 }
