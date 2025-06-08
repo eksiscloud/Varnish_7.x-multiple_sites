@@ -55,8 +55,11 @@ include "/etc/varnish/include/recv/match_php_attack.vcl";
 include "/etc/varnish/include/recv/match_sql_attack.vcl";
 include "/etc/varnish/include/recv/match_wp_attack.vcl";
 
+# Manipulating some urls
+include "/etc/varnish/include/recv/7-manipulate.vcl";
+
 # Is there ban or purge, and who can do it
-include "/etc/varnish/include/ban_purge.vcl";
+include "/etc/varnish/include/recv/8-ban_purge.vcl";
 
 # Something must do before cookies are cleaned
 include "/etc/varnish/include/pre-wordpress.vcl";
@@ -113,9 +116,6 @@ include "/etc/varnish/include/showed.vcl";
 include "/etc/varnish/include/erroed.vcl";
 
 ## ext are something extra
-
-# Manipulating some urls
-include "/etc/varnish/ext/manipulate.vcl";
 
 # Conditional 410
 include "/etc/varnish/ext/410conditional.vcl";
@@ -247,7 +247,7 @@ sub vcl_recv {
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	call ban_purge;
+	call 8-ban_purge;
 	
 	## Setup CORS
 	# ext/cors.vcl
