@@ -38,7 +38,7 @@ sub probes {
 	# Works only when user agent has not been changed, so this will stop only easy ones... 
 	# guess what, the most are really easy in the meaning those script kiddies are really dumb
 	if (req.http.x-bot == "tech") {
-                if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist) {
+                if (req.http.X-Bypass != "true") {
                         return(synth(666, "Forbidden Bot " + req.http.X-Real-IP));
                 }
         }
