@@ -348,6 +348,11 @@ sub vcl_recv {
 	# include/last_ones.vcl
 	call these_too;
 
+	## 50x raportoinnin debug
+	if (req.url ~ "^/test-synth") {
+            return (synth(503, "Pakotettu virhe"));
+	}
+
 	## Cache all others requests if they reach this point.
 	# Needed because of all return jumps.
 	return(hash);
