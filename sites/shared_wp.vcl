@@ -450,14 +450,19 @@ sub vcl_backend_response {
 ## Normally this block isn't visible. I'm using it for grace/errro 503 situation
 sub vcl_backend_error {
 
-	# Let's try again because there isn an error
-	if (bereq.retries < 1) {
-		return(retry);
-	}
+    ## Yritetään kerran uudelleen, jos tämä on ensimmäinen virhe
+    if (bereq.retries < 1) {
+        return (retry);
+    }
 
-	# If grace-object is available, we use it
-	return(deliver);
-# That`s it
+    ## Jos cachessä on grace  käytettävissä, annetaan se
+    return(deliver);
+
+    ## Siirretään 503 error
+    set req.http.X-Fail-Reason = "Backend down";
+    return(fail);
+
+# We are ready here
 }
 
 #######################vcl_deliver#####################
