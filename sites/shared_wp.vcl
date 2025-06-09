@@ -459,7 +459,6 @@ sub vcl_backend_error {
     return(deliver);
 
     ## Siirretään 503 error
-    set req.http.X-Fail-Reason = "Backend down";
     return(fail);
 
 # We are ready here
