@@ -1,4 +1,4 @@
-sub 5-1-real_users {
+sub real_users-5-1 {
 
 	if (req.http.User-Agent ~ "Android") {
 		#set req.http.User-Agent = "Android";

@@ -1,4 +1,4 @@
-sub 8-ban_purge {
+sub ban_purge-8 {
 
 	if (req.method == "BAN" || req.method == "PURGE" || req.method == "REFRESH") {
                if (req.http.X-Bypass != "true") {

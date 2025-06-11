@@ -1,4 +1,4 @@
-sub 3-clean_up {
+sub clean_up-3 {
 
 	### Tidying a little bit places before the work starts.
 

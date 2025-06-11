@@ -1,4 +1,4 @@
-sub asn_blocklist_start {
+sub asn_blocklist_start-2 {
 
         ## If you have just another website for real users maybe It is wise move to ban every single one VPS service
         ## you don't need for APIs etc.
@@ -14,7 +14,7 @@ sub asn_blocklist_start {
         }
 
 	# Let`s filtering
-	call 2-1-asn_id;
+	call asn_id-2-1;
 	call asn_blocklist;
 
 # The sub stops here

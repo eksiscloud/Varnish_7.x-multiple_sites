@@ -215,22 +215,22 @@ sub vcl_recv {
 
 	## Forbidden means forbidden
 	# Nginx deals with countries and user-agents, but one is left: ASN
-	call 2-asn_blocklist_start;
+	call asn_blocklist_start-2;
 
 	## Few small things as reseting headers  before we start working
-	call 3-clean_up;
+	call clean_up-3;
 
 	## Normalizing, part 1
-	call 4-normalizing;
+	call normalizing-4;
 
 	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
-        call 5-user_agents;
+        call user_agents-5;
 		
 	## Huge list of urls and pages that are constantly knocked
 	# There is no one to listening, but those are still hammering backend
 	# acting like low level ddos.
 	# So I waste money and resources to give an error to them
-	call 6-malicious_url;
+	call malicious_url-6;
 
 	## If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
@@ -242,12 +242,12 @@ sub vcl_recv {
 		
 	## URL changes, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
-		call 7-manipulate;
+		call manipulate-7;
 	}
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	call 8-ban_purge;
+	call ban_purge-8;
 	
 	## Setup CORS
 	# ext/cors.vcl

@@ -1,4 +1,4 @@
-sub 4-normalize {
+sub normalize-4 {
 
 	## Redirecting http/80 to https/443
         # This could, and will, happen in Nginx, so this is just a safenet
