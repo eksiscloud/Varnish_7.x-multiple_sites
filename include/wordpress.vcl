@@ -21,7 +21,7 @@ sub wp {
 	## Enable smart refreshing, aka. ctrl+F5 will flush that page
         # Remember your header Cache-Control must be set something else than no-cache
         # Otherwise everything will miss
-        if (req.http.Cache-Control ~ "no-cache" && (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist)) {
+        if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "true") {
                 set req.hash_always_miss = true;
         }
 
@@ -82,14 +82,6 @@ sub wp {
 	if (req.url !~ "^/wp-(admin|login)" && req.url !~ "/logout") {
 		set req.url = std.querysort(req.url);
 	}
-
-	## Ajax-requests: only for visitors
-	# This is hazy. if there is nonce, it is personal and should not cache.
-	# Commented until I'm sure what to do. And do I have such ones in use at all?
-	# Basically everyone I found from logs were by me or bots. And I don't serve bots.
-	#if (req.url ~ "admin-ajax\.php" && req.http.cookie !~ "wordpress_logged_in") {
-	#	return(hash);
-	#}
 
 	# Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
