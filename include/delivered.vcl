@@ -13,9 +13,9 @@ sub deliverit {
 	}
 
 	## Debug for 403
-	if (resp.status == 403) {
-		call debug_headers;
-	}
+	#if (resp.status == 403) {
+	#	call debug_headers;
+	#}
 
 	## And now I remove my helpful tag'ish
 	# Now something like this works:
