@@ -34,7 +34,7 @@ sub malicious_url-6 {
 	if (req.url ~ "apple-app-site-association") { return(synth(403, "Forbidden")); }
 	
 	## Why bots are requesting wp-admin/install.php?
-	if (std.ip(req.http.X-Real-IP, "0.0.0.0") !~ whitelist && req.url ~ "/wp-admin/install.php") {
+	if (req.http.X-Bypass != "true" && req.url ~ "/wp-admin/install.php") {
 		return(synth(666, "Forbidden request"));
 	}
 
