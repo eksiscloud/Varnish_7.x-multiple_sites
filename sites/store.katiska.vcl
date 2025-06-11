@@ -32,25 +32,25 @@ import purge;		# Soft/hard purge by Varnish 7.x
 #import xkey;		# another way to ban
 
 # List of banned countries
-include "/etc/varnish/ext/ban-countries.vcl";
+#include "/etc/varnish/ext/ban-countries.vcl";
 
 # Banning by ASN (uses geoip-VMOD)
-include "/etc/varnish/ext/asn.vcl";
+#include "/etc/varnish/ext/asn.vcl";
 
 # Human's user agent
-include "/etc/varnish/ext/user-ua.vcl";
+#include "/etc/varnish/ext/user-ua.vcl";
 
 # Tools and libraries
-include "/etc/varnish/ext/probes.vcl";
+#include "/etc/varnish/ext/probes.vcl";
 
 # Bots with purpose
-include "/etc/varnish/ext/nice-bot.vcl";
+#include "/etc/varnish/ext/nice-bot.vcl";
 
 # Manipulating some urls
-include "/etc/varnish/ext/manipulate.vcl";
+#include "/etc/varnish/ext/manipulate.vcl";
 
 # Centralized way to handle TTLs
-include "/etc/varnish/ext/cache-ttl.vcl";
+#include "/etc/varnish/ext/cache-ttl.vcl";
 
 # CORS can be handful, so let's give own VCL
 #include "/etc/varnish/ext/cors.vcl";
@@ -145,7 +145,7 @@ sub vcl_recv {
 	# for stop caching uncomment
 	#return(pass);
 	# for dumb TCL-proxy uncomment
-	#return(pipe);
+	return(pipe);
 	
 
 	### The work starts here
@@ -168,7 +168,7 @@ sub vcl_recv {
 	# Heads up: Cloudflare and other big CDNs can route traffic through really strange datacenters 
 	# like from Turkey to Finland via Senegal
 	# For easier updating of the list ext/ban-countries.vcl
-        call close_doors;
+        #call close_doors;
 
         if (req.http.x-ban-country) {
                 std.log("banned country: " + std.toupper(req.http.x-ban-country));
@@ -195,7 +195,7 @@ sub vcl_recv {
 	# I had to pass IPs of WP Rocket even they are using banned ASN; I don't use WP Rocket anymore, though
 	# I need this for trash, that are coming from countries I can't ban.
 	# ext/filtering/asn.vcl
-	call asn_name;
+	#call asn_name;
 
 	## Redirecting http/80 to https/443
         ## This could, and perhaps should, do on Nginx but certbot likes this better
@@ -273,19 +273,19 @@ sub vcl_recv {
 	## User and bots, so let's normalize UA, mostly just for easier reading of varnishtop
         # These should be real users, but some aren't
         # ext/filtering/user-ua.vcl
-        call real_users;
+        #call real_users;
 	
 	# Technical probes, so normalize UA using probes.vcl
 	# These are useful and I want to know if backend is working etc.
 	# ext/filtering/probes.vcl
 	if (req.http.x-bot != "visitor") {
-		call tech_things;
+	#	call tech_things;
 	}
 
 	# These are nice bots, and I'm normalizing using nice-bot.vcl and using just one UA
 	# ext/filtering/nice-bot.vcl
 	if (req.http.x-bot !~ "(visitor|tech)") {
-		call cute_bot_allowance;
+	#	call cute_bot_allowance;
 	}
 
 	# Huge list of urls and pages that are constantly knocked
@@ -332,7 +332,7 @@ sub vcl_recv {
 		
 	## URL changes by ext/redirect/manipulate.vcl, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
-		call new_direction;
+		#call new_direction;
 	}
 	
 	## Save Origin (for CORS) in a custom header and remove Origin from the request 
@@ -777,7 +777,7 @@ sub vcl_backend_response {
 	}
 
 	## How long Varnish will keep objects is guided by ext/cache-ttl.vcl
-	call time_to_go;
+	#call time_to_go;
 	
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
