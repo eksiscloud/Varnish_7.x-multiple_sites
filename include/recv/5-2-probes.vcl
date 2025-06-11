@@ -26,7 +26,7 @@ sub probes-5-2 {
 
 	# KatiskaWarmer will warm up cache, so it has to look like a visitor
         if (req.http.User-Agent == "KatiskaWarmer") {
-                if (std.ip(req.http.X-Real-IP, "0.0.0.0") ~ whitelist) {
+                if (req.http.X-Bypass == "true") {
                         set req.http.x-bot = "visitor";
                         set req.http.x-user-agent = req.http.User-Agent;
                 } else {
