@@ -158,10 +158,10 @@ backend sites {
 }
 
 # Apache2 has fallen down
-backend emergency_nginx {
-	.host = "127.0.0.1";
-	.port = "8989";
-}
+#backend emergency_nginx {
+#	.host = "127.0.0.1";
+#	.port = "8989";
+#}
 
 ## About IPs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0")
@@ -187,10 +187,10 @@ sub vcl_init {
 sub vcl_recv {
 
 	## If the backend is done, we change to emergency mode
-	if (!std.healthy(sites)) {
-		set req.backend_hint = emergency_nginx;
-		return(pipe);
-	}
+#	if (!std.healthy(sites)) {
+#		set req.backend_hint = emergency_nginx;
+#		return(pipe);
+#	}
 
 	## All normal and we use this backend
 	set req.backend_hint = sites;
