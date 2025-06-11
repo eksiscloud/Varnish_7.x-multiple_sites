@@ -32,7 +32,7 @@ include "/etc/varnish/include/recv/1-normalize_host.vcl";
 # Block using ASN
 include "/etc/varnish/include/recv/2-asn_blocklist_start.vcl";
 include "/etc/varnish/include/recv/2-1-asn_id.vcl";
-include "/etc/varnish/include/recv/2-2-asn_blocklist.vcl";
+include "/etc/varnish/include/recv/asn_blocklist.vcl";
 
 # Let's cleanup first reseting headers etc., lightly
 include "/etc/varnish/include/recv/3-clean_up.vcl";
@@ -197,7 +197,7 @@ sub vcl_recv {
 
 	## Normalize hostname to avoid double caching
 	# only for www-domains
-	call 1-normalize_host;
+	call normalize_host-1;
 
         ## just for these virtual hosts
         # for stop caching uncomment

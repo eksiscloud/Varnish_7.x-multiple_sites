@@ -1,4 +1,4 @@
-sub 1-normalize_host {
+sub normalize_host-1 {
 
 	## Just normalizing host names
 	# I like to keep triple-w
