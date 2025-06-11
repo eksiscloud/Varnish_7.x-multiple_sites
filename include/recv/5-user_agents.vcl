@@ -1,4 +1,4 @@
-sub user-agents-5 {
+sub user_agents-5 {
 
 	### Central station for tidying user-agents.
 	## I could normalize UA, but nowadays I leave is as it is, and adding two x-headers:
