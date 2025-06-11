@@ -29,7 +29,7 @@ sub errorit {
 
 	## forbidden error 403
 	if (resp.status == 403) {
-		call debug_headers;
+		#call debug_headers;
 		#std.log("403 response: " + req.url + " IP=" + req.http.X-Real-IP);
 		std.log("403: ip=" + req.http.X-Real-IP +
                         " host=" + req.http.host +
