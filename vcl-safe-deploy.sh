@@ -39,4 +39,4 @@ for site in "${sites[@]}"; do
     fi
 done
 
-echo "✅ All is ready. Checkout the status: varnishadm vcl.list"
+echo "✅ All is ready. Checkout the status: varnishadm -n /dev/shm/varnish vcl.list"

@@ -105,28 +105,14 @@ sub errorit {
 		return(deliver);
 	}
 		
-	## System is down
+	## The backend is down
 	if (resp.status == 503) {
 		set resp.status = 503;
 		set resp.http.Content-Type = "text/html; charset=utf-8";
-		set resp.http.Retry-After = "5";
-		synthetic( {"<!DOCTYPE html>
-		<html>
-			<head>
-				<title>Error "} + resp.status + " " + resp.reason + {"</title>
-			</head>
-			<body>
-				<h1>Error "} + resp.status + " " + resp.reason + {"</h1>
-				<p>"} + resp.reason + " from IP " + std.ip(req.http.X-Real-IP, "0.0.0.0") + {"</p>
-				<h3>Guru Meditation:</h3>
-				<p>XID: "} + req.xid + {"</p>
-				<hr>
-				<p>Varnish cache server</p>
-			</body>
-		</html>
-		"} );
+		set resp.http.X-Varnish-XID = req.xid;
+		synthetic({""});  # body ei ole tärkeä, koska Nginx hoitaa lopun
 		return (deliver);
-	} 
+	}
 	
 	## robots.txt for those sites that not generate theirs own
 	# doesn't work with Wordpress if under construction plugin is on

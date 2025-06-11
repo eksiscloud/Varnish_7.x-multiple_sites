@@ -160,7 +160,7 @@ backend sites {
 # Apache2 has fallen down
 backend emergency_nginx {
 	.host = "127.0.0.1";
-	.port = "8283";
+	.port = "8989";
 }
 
 ## About IPs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
@@ -264,10 +264,16 @@ sub vcl_recv {
 	## Everything what a WordPress needs
 	# include/wordpress.vcl
 	call wp;
+	#call wordpress_debug;
 
 	## Last things to set up
 	# include/last_ones.vcl
 	call these_too;
+
+	## 50x raportoinnin debug
+	if (req.url ~ "^/test-synth") {
+            return (synth(503, "Pakotettu virhe"));
+	}
 
 	## Cache all others requests if they reach this point.
 	# Needed because of all return jumps.
@@ -371,14 +377,18 @@ sub vcl_backend_response {
 ## Normally this block isn't visible. I'm using it for grace/errro 503 situation
 sub vcl_backend_error {
 
-	# Let's try again because there isn an error
-	if (bereq.retries < 1) {
-		return(retry);
-	}
+    ## Yritetään kerran uudelleen, jos tämä on ensimmäinen virhe
+    if (bereq.retries < 1) {
+        return (retry);
+    }
 
-	# If grace-object is available, we use it
-	return(deliver);
-# That`s it
+    ## Jos cachessä on grace  käytettävissä, annetaan se
+    return(deliver);
+
+    ## Siirretään 503 error
+    return(fail);
+
+# We are ready here
 }
 
 #######################vcl_deliver#####################
