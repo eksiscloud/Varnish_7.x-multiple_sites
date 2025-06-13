@@ -130,19 +130,19 @@ include "/etc/varnish/ext/security.vcl";
 ## You can check if a backend is  healthy or sick:
 ## varnishlog -g raw -i Backend_health
 
-probe sondi {
+#probe sondi {
     #.url = "/healthcheck.txt";  # or you can use just an url
 	# you must have installed libwww-perl:
-    .request =
-      "GET /healthcheck.txt HTTP/1.1"
-      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-      "Connection: close"
-      "User-Agent: Varnish Health Probe";
-	.timeout = 5s;
-	.interval = 4s;
-	.window = 5;
-	.threshold = 3;
-}
+#    .request =
+#      "GET /healthcheck.txt HTTP/1.1"
+#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
+#      "Connection: close"
+#      "User-Agent: Varnish Health Probe";
+#	.timeout = 5s;
+#	.interval = 4s;
+#	.window = 5;
+#	.threshold = 3;
+#}
 
 ## Backend tells where a site can be found
 
@@ -154,14 +154,14 @@ backend sites {
 	.first_byte_timeout = 300s;
 	.connect_timeout = 300s;
 	.between_bytes_timeout = 300s;
-	.probe = sondi;
+#	.probe = sondi;
 }
 
 # Apache2 has fallen down
-#backend emergency_nginx {
-#	.host = "127.0.0.1";
-#	.port = "8989";
-#}
+backend snapshot_nginx {
+	.host = "127.0.0.1";
+	.port = "8383";
+}
 
 ## About IPs: I can't use client.ip because it is always 127.0.0.1 by Nginx (or any proxy like Apache2)
 # Instead client.ip it has to be like std.ip(req.http.X-Real-IP, "0.0.0.0")
@@ -185,12 +185,6 @@ sub vcl_init {
 ## Here we are telling to Varnish what to do and what to cache or not. This is not for backend or i.e. browsers
 
 sub vcl_recv {
-
-	## If the backend is done, we change to emergency mode
-#	if (!std.healthy(sites)) {
-#		set req.backend_hint = emergency_nginx;
-#		return(pipe);
-#	}
 
 	## All normal and we use this backend
 	set req.backend_hint = sites;
@@ -271,9 +265,9 @@ sub vcl_recv {
 	call these_too;
 
 	## 50x raportoinnin debug
-	if (req.url ~ "^/test-synth") {
-            return (synth(503, "Pakotettu virhe"));
-	}
+	#if (req.url ~ "^/test-synth") {
+        #    return (synth(503, "Pakotettu virhe"));
+	#}
 
 	## Cache all others requests if they reach this point.
 	# Needed because of all return jumps.
@@ -346,6 +340,14 @@ sub vcl_miss {
 	## Last call
 }
 
+###################vcl_backend_fetch###############
+#
+sub vcl_backend_fetch {
+
+	if (bereq.backend == snapshot_nginx) {
+             set bereq.http.X-Emergency-Redirect = "true";
+	}
+}
 
 ###################vcl_backend_response#############
 # This will alter everything what a backend responses back to Varnish
@@ -377,16 +379,27 @@ sub vcl_backend_response {
 ## Normally this block isn't visible. I'm using it for grace/errro 503 situation
 sub vcl_backend_error {
 
-    ## Yritetään kerran uudelleen, jos tämä on ensimmäinen virhe
-    if (bereq.retries < 1) {
+	if (bereq.retries == 0) {
+             std.syslog(180, "ALERT: Apache is not responding on first attempt: " + bereq.url);
+        }
+ 
+   # Jos ei vielä ole retry tehty, tee se
+    if (bereq.retries == 0) {
+        std.log(">> Backend error: first retry");
         return (retry);
     }
 
-    ## Jos cachessä on grace  käytettävissä, annetaan se
-    return(deliver);
+    # Jos ensimmäinen retry tehty, kokeillaan snapshot-backendia
+    if (bereq.retries == 1 &&
+        (beresp.status == 500 || beresp.status == 503 || beresp.status == 504)) {
+        std.log(">> Backend error: switching to snapshot backend");
+        set bereq.backend = snapshot_nginx;
+        return (retry);
+    }
 
-    ## Siirretään 503 error
-    return(fail);
+    # Mikään ei toiminut, anna virhe asiakkaalle
+    std.log(">> Backend error: all retries failed");
+    return (fail);
 
 # We are ready here
 }

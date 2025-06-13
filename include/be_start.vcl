@@ -21,15 +21,37 @@ sub be_started {
 	        set beresp.grace = 12h;
 	}
 
-	## Backend is down, stop caching but using ttl+grace instead
-	if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
-		if (bereq.is_bgfetch) {
-			std.syslog(180, "Backend failure, abandoning fetch for " + bereq.url);
-			return(abandon);
-		}
-		set beresp.uncacheable = true;
-	}
-	
+	    # Jos käytössä on snapshot-backendi ja vastaus on 200, vaihda se 503:ksi
+    if (bereq.backend == snapshot_nginx && beresp.status == 200) {
+        std.log(">> Snapshot backend responded 200 — rewriting to 302");
+        set beresp.status = 302;
+        set beresp.reason = "Service Unavailable (snapshot)";
+    }
+
+    # Jos saatiin backend-virhe (500/502/503/504)
+    if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
+
+        # Jos tämä oli taustahaku (esim. grace-toimituksen jälkeen), hylätään
+        if (bereq.is_bgfetch) {
+            std.syslog(180, "Backend failure, abandoning bgfetch for " + bereq.url);
+            return(abandon);
+        }
+
+        # Estä välimuisti vain, jos ei olla snapshotissa
+        if (bereq.backend != snapshot_nginx) {
+            std.syslog(180, "Backend failure, marking response uncacheable: " + bereq.url);
+            set beresp.uncacheable = true;
+        }
+    }
+
+    # Snapshot-backendille määritetään erillinen cachelogiikka
+    if (bereq.backend == snapshot_nginx) {
+        # Varmistetaan, että snapshotit menevät cacheen lyhyeksi aikaa
+        set beresp.ttl = 60m;
+        set beresp.grace = 15m;
+        set beresp.keep = 2m;
+        #std.syslog(180, "Snapshot backend, setting short TTL/grace: " + bereq.url);
+    }	
 	## xkey for smarter PURGE
 #	if (beresp.http.X-Cache-Tags) {
 #		set beresp.http.xkey = beresp.http.X-Cache-Tags;
