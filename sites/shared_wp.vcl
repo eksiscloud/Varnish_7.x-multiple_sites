@@ -158,7 +158,7 @@ backend sites {
 }
 
 # Apache2 has fallen down
-backend snapshot_nginx {
+backend snapshot {
 	.host = "127.0.0.1";
 	.port = "8383";
 }
