@@ -207,15 +207,15 @@ sub errorit {
 	}
 
 	## Error 410 for amp/taxonomy spamming by googlebot
-	if (resp.status == 811) {
-		set resp.status = 410;
-		set resp.reason = "Gone";
-		set resp.http.Content-Type = "text/plain; charset=utf-8";
-		set resp.http.X-Robots-Tag = "noindex, nofollow";
-		set resp.http.Cache-Control = "public, max-age=3600";
-		synthetic("Gone. This taxonomy never existed.\n");
-		return (deliver);
-    }
+	#if (resp.status == 811) {
+	#	set resp.status = 410;
+	#	set resp.reason = "Gone";
+	#	set resp.http.Content-Type = "text/plain; charset=utf-8";
+	#	set resp.http.X-Robots-Tag = "noindex, nofollow";
+	#	set resp.http.Cache-Control = "public, max-age=3600";
+	#	synthetic("Gone. This taxonomy never existed.\n");
+	#	return (deliver);
+    #}
 
 	## Purge by xkey
 	#if (req.http.xkey-purge) {
