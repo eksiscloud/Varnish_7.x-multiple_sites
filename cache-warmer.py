@@ -6,21 +6,17 @@ import datetime
 import sys
 import time
 
-MATOMO_API_URL = "https://stats.eksis.eu/index.php"
-TOKEN = "71e06dc07870c9e6a22f8a4323d7970f"  # Vaihda oikea token
+MATOMO_API_URL = "https://matomo/index.php" # change this
+TOKEN = "matomo-api-token"  # change this
 
 # Nickname - Matomo ID - url
 SITES = {
-    "katiska": {"id": 1, "domain": "www.katiska.eu"},
-    "poochie": {"id": 15, "domain": "www.poochierevival.info"},
-    "eksis": {"id": 2, "domain": "www.eksis.one"},
-    "selko": {"id": 5, "domain": "selko.katiska.eu"},
-    "dev": {"id": 11, "domain": "dev.eksis.one"},
-    "jagster": {"id": 17, "domain": "jagster.eksis.one"},
+    "example": {"id": 1, "domain": "www.example.com"},
+    "another": {"id": 15, "domain": "www.example.tld"},
 }
 
 HEADERS = {
-    "User-Agent": "CacheWarmer/1.0"
+    "User-Agent": "CacheWarmer/1.0" # what ever you like
 }
 
 
@@ -30,7 +26,7 @@ def matomo_api_call(params):
         response.raise_for_status()
         return response.json()
     except Exception as e:
-        print(f"[Virhe] Matomo API-pyyntö epäonnistui: {e}")
+        print(f"[Error] Matomo API-request failed: {e}")
         return []
 
 
@@ -46,7 +42,7 @@ def get_top_urls(site_id, start_date, end_date):
         "token_auth": TOKEN,
     }
 
-    print("⏳ Haetaan Matomolta pääsivuston URLit...")
+    print("Get main urls from Matomo...")
     data = matomo_api_call(params)
     urls = []
 
@@ -78,7 +74,7 @@ def ban_and_warm(domain, urls):
             path = "/" + path
         full_url = f"https://{domain}{path}"
 
-        # 🖥️ Tulosta mitä tehdään
+        # Printing what is happening
         print(f"📛 BANNING: {path}")
 
         ban_expr = f'req.url ~ "^{path}"'
@@ -88,7 +84,7 @@ def ban_and_warm(domain, urls):
                 "-T", "localhost:6082", "ban", ban_expr
             ], check=True)
         except subprocess.CalledProcessError as e:
-            print(f"[Virhe] {full_url}: Varnish ban epäonnistui: {e}")
+            print(f"[Error] {full_url}: Varnish BAN failed: {e}")
             continue
 
         print(f"🔥 FETCHING: {full_url}\n")
@@ -101,19 +97,19 @@ def ban_and_warm(domain, urls):
             ], stdout=subprocess.DEVNULL, check=True)
             warmed_urls.append(full_url)
         except subprocess.CalledProcessError as e:
-            print(f"[Virhe] {full_url}: Fetch epäonnistui: {e}")
+            print(f"[Error] {full_url}: Fetch failed: {e}")
 
     return warmed_urls
 
 
 def main():
     if len(sys.argv) != 2:
-        print("Käyttö: ./cache-warmer.py <sivuston_nimi>")
+        print("Usage: ./cache-warmer.py <nickname>")
         sys.exit(1)
 
     site_name = sys.argv[1]
     if site_name not in SITES:
-        print(f"[Virhe] Tuntematon sivusto: {site_name}")
+        print(f"[Error] Unknown site: {site_name}")
         sys.exit(1)
 
     today = datetime.date.today()
@@ -126,7 +122,7 @@ def main():
     urls = get_top_urls(site["id"], start.isoformat(), end.isoformat())
 
     if not urls:
-        print("⚠️  Yhtään URLia ei löytynyt.")
+        print("Couldn't find any site")
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
@@ -137,12 +133,12 @@ def main():
             tmp_file.write(full_url + "\n")
         tmp_filename = tmp_file.name
 
-    print(f"📄 URL-lista tallennettu: {tmp_filename}")
-    print(f"🔥 Lämmitetään cache {len(urls)} URLille...\n")
+    print(f"URL list saved: {tmp_filename}")
+    print(f"🔥 Warming up cache for {len(urls)} URLs...\n")
 
     warmed = ban_and_warm(domain, urls)
 
-    print(f"\n✅ Valmis. {len(warmed)} URLia lämmitetty backendiltä.")
+    print(f"\n✅ Ready. {len(warmed)} URLs from the backend are warmed up.")
 
 
 if __name__ == "__main__":
