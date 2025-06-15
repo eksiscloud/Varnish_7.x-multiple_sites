@@ -25,7 +25,7 @@ sub probes-5-2 {
 	}
 
 	# KatiskaWarmer will warm up cache, so it has to look like a visitor
-        if (req.http.User-Agent == "KatiskaWarmer") {
+        if (req.http.User-Agent == "SnapshotWarmer" || req.http.User-Agent == "CacheWarmer") {
                 if (req.http.X-Bypass == "true") {
                         set req.http.x-bot = "visitor";
                         set req.http.x-user-agent = req.http.User-Agent;

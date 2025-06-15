@@ -14,7 +14,7 @@ sub wp {
         ## Cache warmup
         # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
         # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
-        if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "CacheWarmer") {
+        if (req.http.X-Bypass-Cache == "1" && req.http.User-Agent == "SnapshotWarmer") {
                 return(pass);
         }	
 
