@@ -9,10 +9,14 @@ import time
 MATOMO_API_URL = "https://stats.eksis.eu/index.php"
 TOKEN = "71e06dc07870c9e6a22f8a4323d7970f"  # Vaihda oikea token
 
+# Nickname - Matomo ID - url
 SITES = {
     "katiska": {"id": 1, "domain": "www.katiska.eu"},
-    "poochie": {"id": 16, "domain": "www.poochierevival.info"},
+    "poochie": {"id": 15, "domain": "www.poochierevival.info"},
     "eksis": {"id": 2, "domain": "www.eksis.one"},
+    "selko": {"id": 5, "domain": "selko.katiska.eu"},
+    "dev": {"id": 11, "domain": "dev.eksis.one"},
+    "jagster": {"id": 17, "domain": "jagster.eksis.one"},
 }
 
 HEADERS = {
@@ -38,7 +42,7 @@ def get_top_urls(site_id, start_date, end_date):
         "period": "range",
         "date": f"{start_date},{end_date}",
         "format": "JSON",
-        "filter_limit": "200",
+        "filter_limit": "200", # top-200
         "token_auth": TOKEN,
     }
 
@@ -87,7 +91,7 @@ def ban_and_warm(domain, urls):
             print(f"[Virhe] {full_url}: Varnish ban epäonnistui: {e}")
             continue
 
-        print(f"🔥 FETCHING: {full_url}")
+        print(f"🔥 FETCHING: {full_url}\n")
         try:
             subprocess.run([
                 "curl", "-s",
@@ -113,7 +117,7 @@ def main():
         sys.exit(1)
 
     today = datetime.date.today()
-    start = today - datetime.timedelta(days=30)
+    start = today - datetime.timedelta(days=30) # time frame
     end = today
 
     site = SITES[site_name]
@@ -134,7 +138,7 @@ def main():
         tmp_filename = tmp_file.name
 
     print(f"📄 URL-lista tallennettu: {tmp_filename}")
-    print(f"🔥 Lämmittetään cache {len(urls)} URLille...\n")
+    print(f"🔥 Lämmitetään cache {len(urls)} URLille...\n")
 
     warmed = ban_and_warm(domain, urls)
 
