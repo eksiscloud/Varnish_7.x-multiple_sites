@@ -344,7 +344,7 @@ sub vcl_miss {
 #
 sub vcl_backend_fetch {
 
-	if (bereq.backend == snapshot_nginx) {
+	if (bereq.backend == snapshot) {
              set bereq.http.X-Emergency-Redirect = "true";
 	}
 }
@@ -393,7 +393,7 @@ sub vcl_backend_error {
     if (bereq.retries == 1 &&
         (beresp.status == 500 || beresp.status == 503 || beresp.status == 504)) {
         std.log(">> Backend error: switching to snapshot backend");
-        set bereq.backend = snapshot_nginx;
+        set bereq.backend = snapshot;
         return (retry);
     }
 
@@ -470,10 +470,10 @@ sub vcl_synth {
 
 	## Googlebot and amp_taxonomy errors
         # created by include/clean_up.vcl
-        if (resp.status == 200 && resp.reason == "Not an AMP endpoint.") {
-                set resp.http.Content-Type = "text/plain; charset=utf-8";
-                set resp.http.X-Robots-Tag = "noindex, nofollow";
-        }	
+        #if (resp.status == 200 && resp.reason == "Not an AMP endpoint.") {
+        #        set resp.http.Content-Type = "text/plain; charset=utf-8";
+        #        set resp.http.X-Robots-Tag = "noindex, nofollow";
+        #}	
 
 	## Needed here, I suppose
 	return (deliver);
