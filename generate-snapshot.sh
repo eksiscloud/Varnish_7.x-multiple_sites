@@ -1,31 +1,31 @@
 #!/bin/bash
 
-# Snapshot-tallennushakemisto
-TARGET_DIR="/var/www/emergency/katiska/www.katiska.eu"
+# Snapshot-saving directory
+TARGET_DIR="/var/www/emergency/example/www.example.tld"
 
-# Pääsivuston osoite
-BASE_URL="https://www.katiska.eu"
+# The address of the site
+BASE_URL="https://www.example.tld"
 SITEMAP_INDEX="$BASE_URL/sitemap_index.xml"
 
-# Luo väliaikaishakemisto
+# Create temp directory
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Poimi alisitemapit
-echo "Ladataan sitemap_index.xml ja poimitaan alisitemapit..."
+# Get sub-sitemaps
+echo "Loading sitemap_index.xml and fetching sub-sitemaps..."
 curl -s "$SITEMAP_INDEX" | grep -oP '(?<=<loc>)[^<]+' > "$TMPDIR/sitemaps.txt"
 
 > "$TMPDIR/urls.txt"
 
-# Käydään jokainen alisitemap läpi ja kerätään varsinaiset URLit
-echo "Poimitaan kaikki varsinaiset URLit alisitemapeista..."
+# Picking up every real urls from sub-sitemaps
+echo "Gettimg every actual urls from sub-sitemaps..."
 while read -r sitemap; do
     echo "  → $sitemap"
     curl -s "$sitemap" | grep -oP '(?<=<loc>)[^<]+' >> "$TMPDIR/urls.txt"
 done < "$TMPDIR/sitemaps.txt"
 
-# Ladataan sivut snapshotiksi
-echo "Ladataan snapshotit (sivumäärä: $(wc -l < "$TMPDIR/urls.txt"))..."
+# Loadimg pages to snapshot
+echo "Loadimg snapshots (pages: $(wc -l < "$TMPDIR/urls.txt"))..."
 wget \
   --input-file="$TMPDIR/urls.txt" \
   --mirror \
@@ -34,7 +34,7 @@ wget \
   --page-requisites \
   --no-parent \
   --span-hosts \
-  --domains=www.katiska.eu,cdn.katiska.eu \
+  --domains=www.example.tld,cdn.example.tld \
   --header="X-Bypass-Cache: 1" \
   --header="User-Agent:SnapshotWarmer/1.0" \
   --execute robots=off \
@@ -44,4 +44,4 @@ wget \
   --tries=3 \
   --directory-prefix="$TARGET_DIR"
 
-echo "✅ Snapshot luotu kohteeseen: $TARGET_DIR"
+echo "✅ Snapshot ceeated: $TARGET_DIR"
