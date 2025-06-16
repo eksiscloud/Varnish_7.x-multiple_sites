@@ -1,20 +1,23 @@
 sub wp {
-
+std.log(">> DEBUG: reached top of wp-pass");
         ## Implementing websocket support
         if (req.http.Upgrade ~ "(?i)websocket") {
                 return(pipe);
+		std.log(">> DEBUG: websocket pipe = " + req.url);
         }
 
 	## Only GET and HEAD are cacheable methods AFAIK
         # In-build rule too
         if (req.method != "GET" && req.method != "HEAD") {
-                return(pass);
+		std.log(">> DEBUG: pass !GET/Head = " + req.url);  
+              return(pass);
         }
 
         ## Cache warmup
         # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
         # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
         if (req.http.X-Bypass-Cache == "1") {
+		std.log(">> DEBUG: pass CacheWarmer = " + req.url);
                 return(pass);
         }	
 
@@ -22,27 +25,32 @@ sub wp {
         # Remember your header Cache-Control must be set something else than no-cache
         # Otherwise everything will miss
         if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "1") {
-                set req.hash_always_miss = true;
+                std.log(">> DEBUG: has-always-miss ctrl F5 = " + req.url);
+		set req.hash_always_miss = true;
         }
 
 	## Do not cache AJAX requests.
 	if (req.http.X-Requested-With == "XMLHttpRequest") {
+		std.log(">> DEBUG: pass ajax = " + req.url);
 		return(pass);
 	}
 
         ## Don't cache wordpress related pages
         if (req.url ~ "(signup|activate|mail|logout)") {
-                return(pass);
+                std.log(">> DEBUG: pass WP related = " + req.url);
+		return(pass);
         }
 
         ## Must Use plugins I reckon
         if (req.url ~ "/mu-.*") {
-                return(pass);
+                std.log(">> DEBUG: pass mu-plugins = " + req.url);
+		return(pass);
         }
 		
 	## Adsense incomings are lower when Varnish is on, trying to solve out this
 	# is it because of caching or CSP-rules?
 	if (req.url ~ "adsbygoogle") {
+		std.log(">> DEBUG: pass ads = " + req.url);
 		return(pass);
 	}
 
@@ -51,28 +59,33 @@ sub wp {
         
         # Mastodon/ActivityPub
         if (req.url ~ "^/wp-json/(activitypub|friends)/") {
-                return(pass);
+               	std.log(">> DEBUG: pass wp-json/feder. = " + req.url);
+		return(pass);
         }
 	if (req.url ~ "^/api/(v1|v2)/") {
+		std.log(">> DEBUG: pass api/feder. = " + req.url);
 		return(pass);
 	}
 	if (req.url ~ "^/(nodeinfo|webfinger)") {
+		std.log(">> DEBUG: pass webfinger = " + req.url);
 		return(pass);
 	}
 	
 	# .well-known API route should not be cached
         if (req.url ~ "^/.well-known/") {
+		std.log(">> DEBUG: pass wellknown = " + req.url);
                 return(pass);
         }
 
         # WordPress REST API
 	if (req.url ~ "/wp-json/wp/") {
 		if (req.http.Cookie ~ "wordpress_logged_in") {
+			std.log(">> DEBUG: pass wp rest api = " + req.url);
 			return(pass);
 		}
 		return(synth(403, "Unauthorized request"));
 	}
-
+std.log(">> DEBUG: after all normal pass");
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
         # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
@@ -144,5 +157,5 @@ sub wp {
 	# Every other VCL examples use this really early, but those are really aged tips and 
 	# I'm not so sure if those are actually ever tested in production.
 	set req.url = std.querysort(req.url);
-
+std.log(">> DEBUG: reached end of wp-pass");
 }

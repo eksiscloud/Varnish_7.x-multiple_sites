@@ -188,7 +188,7 @@ sub vcl_recv {
 
 	## All normal and we use this backend
 	set req.backend_hint = sites;
-
+std.log(">> DEBUG: reached top of vcl_recv");
 	## Normalize hostname to avoid double caching
 	# only for www-domains
 	call normalize_host-1;

@@ -21,5 +21,29 @@ sub normalize_host-1 {
                 set req.http.X-Real-IP = client.ip;
         }
 
+std.log(">> DEBUG: URL = " + req.url);
+
+if (req.http.cookie) {
+    std.log(">> DEBUG: Cookie when entering = " + req.http.cookie);
+} else {
+    std.log(">> DEBUG: No Cookie header at all");
+}
+
+if (req.http.X-Bypass) {
+    std.log(">> DEBUG: X-Bypass = " + req.http.X-Bypass);
+}
+
+if (req.http.X-Bypass-Cache) {
+    std.log(">> DEBUG: X-Bypass-Cache = " + req.http.X-Bypass-Cache);
+}
+
+if (req.http.User-Agent) {
+    std.log(">> DEBUG: UA = " + req.http.User-Agent);
+}
+
+if (req.http.Sec-Fetch-Site) {
+    std.log(">> DEBUG: Sec-Fetch-Site = " + req.http.Sec-Fetch-Site);
+}
+
 # it ends here
 }

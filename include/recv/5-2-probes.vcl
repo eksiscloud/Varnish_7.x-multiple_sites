@@ -95,5 +95,6 @@ sub probes-5-2 {
                 std.log("BOT_DETECTED IP=" + req.http.X-Real-IP + " " + req.http.X-Country-Code + " User-Agent:" + req.http.User-Agent);
         }
 
+std.log(">> DEBUG: reached user agent2");
 # And here's the end
 }

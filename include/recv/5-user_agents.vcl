@@ -17,6 +17,6 @@ sub user_agents-5 {
         if (req.http.x-bot !~ "(visitor|tech)$") {
                 call nice-bots-5-3;
         }
-
+std.log(">> DEBUG: reached user agent1");
 # That's all folk
 }

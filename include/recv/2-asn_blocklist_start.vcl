@@ -16,6 +16,6 @@ sub asn_blocklist_start-2 {
 	# Let`s filtering
 	call asn_id-2-1;
 	call asn_blocklist;
-
+std.log(">> DEBUG: asn ok");
 # The sub stops here
 }

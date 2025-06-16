@@ -19,4 +19,10 @@ sub eat_it {
 		}
 	}
 
+if (req.http.cookie) {
+    std.log(">> DEBUG: Cookie after cleaning = " + req.http.cookie);
+} else {
+    std.log(">> DEBUG: No Cookie header after cookie monster");
+}
+
 }

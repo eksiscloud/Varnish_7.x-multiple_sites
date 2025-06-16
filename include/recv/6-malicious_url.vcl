@@ -37,7 +37,7 @@ sub malicious_url-6 {
 	if (req.http.X-Bypass != "true" && req.url ~ "/wp-admin/install.php") {
 		return(synth(666, "Forbidden request"));
 	}
-
+std.log(">> DEBUG: reached malicious urls");
 # It ends here
 }
 
