@@ -42,6 +42,15 @@ sub normalize-4 {
         if (std.healthy(req.backend_hint)) {
                 set req.grace = 43200s;
         }
+
+	## X-Bypass-Cache needs...
+	# acl
+	if (req.http.X-Bypass != "true" && req.http.X-Bypass-Cache) {
+		unset req.http.X-Bypass-Cache;
+	# Out there is two variants, true and 1
+	elseif (req.http.X-Bypass-Cache == "true") {
+		set req.http.X-Bypass-Cache = "1";
+	}
         
         ## Only deal with "normal" types
         # In-build rules. Those aren't needed, unless return(...) forces skip it.
@@ -61,10 +70,6 @@ sub normalize-4 {
         # Why send the packet upstream, while the visitor is using a non-valid HTTP method?
                 return(synth(405, "Non-valid HTTP method!"));
         }
-
-        ## Normalizing language
-	# useful if accept is in use
-        #set req.http.Accept-Language = lang.filter(req.http.Accept-Language);
 
 	## Remove the Google Analytics added parameters, useless for backend
 	if (req.url ~ "(\?|&)(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|cx|ie|cof|siteurl)=") {
