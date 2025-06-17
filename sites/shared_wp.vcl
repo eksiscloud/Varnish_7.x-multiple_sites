@@ -247,20 +247,13 @@ sub vcl_recv {
 	# ext/cors.vcl
 	call cors;
 
-        ## Fix Wordpress visual editor and login issues, must be the first url pass requests and
-        #  before cookie monster to work.
-        # Backend of Wordpress
-        if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
-                return(pass);
-        }
+        ## These must, should or could do before cookie monster
+        # includes/pre-wordpress.vcl
+        call before_wp;
 
         ## The infamous Cookie Monster
         # include/cookie_monster.vcl
         call eat_it;
-
-	## These must, should or could do before cookie monster
-	# includes/pre-wordpress.vcl
-	call before_wp;
 
 	## Everything what a WordPress needs
 	# include/wordpress.vcl
