@@ -2,9 +2,12 @@ sub showit {
 
 	### The last part of vcl_deliver, manipulating headers etc.
 
-	## Using ETAG (content based) by backend is more accurate than Last-Modified (time based), 
-	# but I want to get last-modified because I'm curious, even curiosity kills the cat
-	set resp.http.Modified = resp.http.Last-Modified;
+	## Last-Modified timestamp may be interesting for users, but unnecessary
+	# but I want to mask it a little bit, and show it, because I'm curious, even curiosity kills the cat
+	# Last-Modified comes only from backend. Cached content hasn't it.
+	if (resp.http.Last-Modified != "") {
+		set resp.http.those-good-old-days = resp.http.Last-Modified;
+	}
 	unset resp.http.Last-Modified;
 	
 	## Just to be sure who is seeing what
