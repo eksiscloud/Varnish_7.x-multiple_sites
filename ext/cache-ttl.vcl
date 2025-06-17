@@ -39,7 +39,7 @@ sub time_to_go {
   	## allow for validation. 
 	# Basically we are caching 304 and giving opportunity to not fetch an uncacheable object,
 	# if verification is allowed and use user's or intermediate cache.
-	if (beresp.ttl <= 0s && (beresp.http.ETag || beresp.http.Last-Modified)) {
+	if (beresp.ttl <= 0s && beresp.http.Last-Modified)) {
 		return(pass(120s));
 	}
 
