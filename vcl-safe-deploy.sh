@@ -25,18 +25,22 @@ if ! varnishd -Cf "$vclfile" > /dev/null 2>&1; then
 fi
 
 echo "✅ Syntax OK. Continuing deploy..."
+echo
 
 # Load and label for every site
 for site in "${sites[@]}"; do
     vclname="${site}_${timestamp}"
-    echo "==> Update $site → $vclname"
+    echo -e "==> Update $site → $vclname"
+    echo
 
-    if varnishadm -n varnishd vcl.load "$vclname" "$vclfile"; then
-        varnishadm -n varnishd vcl.label "$site" "$vclname"
-        echo "✓ Label has set: $site → $vclname"
+    if varnishadm vcl.load "$vclname" "$vclfile"; then
+        varnishadm vcl.label "$site" "$vclname"
+        echo -e "✓ Label has set: $site → $vclname"
+        echo
     else
         echo "✗ ERROR: VCL loading failed for $site"
     fi
 done
 
-echo "✅ All is ready. Checkout the status: varnishadm -n /dev/shm/varnish vcl.list"
+echo "✅ All is ready. Checkout the status: varnishadm vcl.list"
+echo "# The cosmetic line hell remained undefeated. Varnishadm 1 – Aesthetics 0."
