@@ -1,31 +1,44 @@
 #!/bin/bash
 
-# Snapshot-saving directory
-TARGET_DIR="/var/www/emergency/example/www.example.tld"
+# Nicknames, urls and snapshot directories
+case "$1" in
+  example)
+    DOMAIN="www.example.com"
+    TARGET_DIR="/var/www/emergency/example/$DOMAIN"
+    ;;
+  try)
+    DOMAIN="try.example.tld"
+    TARGET_DIR="/var/www/emergency/try/$DOMAIN"
+    ;;
+  third)
+    DOMAIN="www.example.invalid"
+    TARGET_DIR="/var/www/emergency/third/$DOMAIN"
+    ;;
+  *)
+    echo "❌ Unknown site: $1"
+    echo "Usage: $0 {example|try|third}"
+    exit 1
+    ;;
+esac
 
-# The address of the site
-BASE_URL="https://www.example.tld"
+BASE_URL="https://$DOMAIN"
 SITEMAP_INDEX="$BASE_URL/sitemap_index.xml"
 
-# Create temp directory
+# Create temp dir
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Get sub-sitemaps
-echo "Loading sitemap_index.xml and fetching sub-sitemaps..."
+echo "Loading sitemap_index.xml: $SITEMAP_INDEX"
 curl -s "$SITEMAP_INDEX" | grep -oP '(?<=<loc>)[^<]+' > "$TMPDIR/sitemaps.txt"
 
 > "$TMPDIR/urls.txt"
-
-# Picking up every real urls from sub-sitemaps
-echo "Gettimg every actual urls from sub-sitemaps..."
+echo "Picking urls from sub-sitemaps..."
 while read -r sitemap; do
     echo "  → $sitemap"
     curl -s "$sitemap" | grep -oP '(?<=<loc>)[^<]+' >> "$TMPDIR/urls.txt"
 done < "$TMPDIR/sitemaps.txt"
 
-# Loadimg pages to snapshot
-echo "Loadimg snapshots (pages: $(wc -l < "$TMPDIR/urls.txt"))..."
+echo "📥 loading snapshot, ($(wc -l < "$TMPDIR/urls.txt") URLs)..."
 wget \
   --input-file="$TMPDIR/urls.txt" \
   --mirror \
@@ -34,7 +47,7 @@ wget \
   --page-requisites \
   --no-parent \
   --span-hosts \
-  --domains=www.example.tld,cdn.example.tld \
+  --domains=$DOMAIN,cdn.$DOMAIN \
   --header="X-Bypass-Cache: 1" \
   --header="User-Agent:SnapshotWarmer/1.0" \
   --execute robots=off \
@@ -44,4 +57,4 @@ wget \
   --tries=3 \
   --directory-prefix="$TARGET_DIR"
 
-echo "✅ Snapshot ceeated: $TARGET_DIR"
+echo "✅ Snapshot created: $TARGET_DIR"
