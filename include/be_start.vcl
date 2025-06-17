@@ -8,7 +8,7 @@ sub be_started {
 	# or
 	# varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
 	std.log("backend: " + beresp.backend.name);
-	
+
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
