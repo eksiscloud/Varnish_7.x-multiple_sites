@@ -47,6 +47,7 @@ sub normalize-4 {
 	# acl
 	if (req.http.X-Bypass != "true" && req.http.X-Bypass-Cache) {
 		unset req.http.X-Bypass-Cache;
+	}
 	# Out there is two variants, true and 1
 	elseif (req.http.X-Bypass-Cache == "true") {
 		set req.http.X-Bypass-Cache = "1";
