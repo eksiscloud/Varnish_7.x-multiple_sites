@@ -27,6 +27,12 @@ sub be_started {
 		return (fail);
 	}
 
+        ## One really stranger thing where backend can tell 503, let's start snapshot route
+        if (beresp.status == 503) {
+                std.syslog(180, "Backend: error  HTTP 503 – move to vcl_backend_error");
+                return (fail);
+        }
+
         ## Backend has gateway issue, let's start snapshot route
         if (beresp.status == 504) {
                 std.syslog(180, "Backend: error  HTTP 504 – move to vcl_backend_error");
