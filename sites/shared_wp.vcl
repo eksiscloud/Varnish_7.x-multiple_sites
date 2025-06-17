@@ -386,12 +386,9 @@ sub vcl_backend_response {
 ## Normally this block isn't visible. I'm using it for grace/errro 503 situation
 sub vcl_backend_error {
 
-	if (bereq.retries == 0) {
-             std.syslog(180, "ALERT: Apache is not responding on first attempt: " + bereq.url);
-        }
- 
    # Jos ei vielä ole retry tehty, tee se
     if (bereq.retries == 0) {
+	std.syslog(180, "ALERT: Apache is not responding on first attempt: " + bereq.url);
         std.log(">> Backend error: first retry");
         return (retry);
     }

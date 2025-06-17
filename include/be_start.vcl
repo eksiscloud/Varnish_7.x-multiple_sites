@@ -21,6 +21,18 @@ sub be_started {
 	        set beresp.grace = 12h;
 	}
 
+	## Wordpress is down, let's start snapshot route
+	if (beresp.status == 500) {
+		std.syslog(180, "Backend: error  HTTP 500 – move to vcl_backend_error");
+		return (fail);
+	}
+
+        ## Backend has gateway issue, let's start snapshot route
+        if (beresp.status == 504) {
+                std.syslog(180, "Backend: error  HTTP 504 – move to vcl_backend_error");
+                return (fail);
+        }
+
 	## if backend is down we move to snapshot backend that serves static content, when not in cache
 	## Few things must  be changed then
 	# Varnish uses 200 OK, because it got content, but we don't want to tell to bits that temporary content is 200
@@ -30,7 +42,7 @@ sub be_started {
 		set beresp.reason = "Service Unavailable (snapshot)";
 	}
 
-	# If there was an backend error (500/502/503/504)
+	## If there was an backend error (500/502/503/504) where backend can give a response
 	if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
 
         	# If this was a background fetch (i.e. after grace delivering), abandom
