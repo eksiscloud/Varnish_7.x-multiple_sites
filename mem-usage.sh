@@ -24,8 +24,8 @@ echo "Memory in use:             ${used_gb} GiB"
 echo "Marked as garbage:         ${garbage_gb} GiB (${garbage_percent}% of memory)"
 echo "Totally in use:            ${total_gb} GiB"
 
-if [[ -n "$object_count" ]]; then
-    echo "Amount of objects in cache: $object_count"
-else
-    echo "Amount isn't available (not supporter or no data)."
-fi
+#if [[ -n "$object_count" ]]; then
+#    echo "Amount of objects in cache: $object_count"
+#else
+#    echo "Amount of objects isn't available (not supporter or no data)."
+#fi
