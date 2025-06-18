@@ -7,7 +7,7 @@ import sys
 import time
 
 MATOMO_API_URL = "https://matomo/index.php"
-TOKEN = "dd1a3d9bc5662bd1a7227cb3840445b8"  # Aseta oikea token
+TOKEN = "<long-api-key"  # give right token
 
 #  nickname - Matomo ID - url
 SITES = {
