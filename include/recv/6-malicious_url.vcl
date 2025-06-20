@@ -16,6 +16,10 @@ sub malicious_url-6 {
 		return (synth(666, "The site is unreachable"));
 	}
 
+        if (req.url ~ "^/xmlrpc.php" && req.http.X-Bypass != "true") {
+                return (synth(666, "The site is unreachable"));
+        }
+
 	## I have one site using category wordpress
 	if (req.http.host !~ "www.eksis.one") {
 		if (req.url ~ "^/wordpress") {
