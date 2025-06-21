@@ -21,7 +21,7 @@ sub wp {
 	## Enable smart refreshing, aka. ctrl+F5 will flush that page
         # Remember your header Cache-Control must be set something else than no-cache
         # Otherwise everything will miss
-        if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "1") {
+        if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "1" && req.http.Cookie) {
                 set req.hash_always_miss = true;
         }
 

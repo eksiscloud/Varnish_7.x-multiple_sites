@@ -22,7 +22,7 @@ sub deliverit {
 	# varnishlog -c -g request -i Req* -i Resp* -I Timestamp:Resp -x ReqAcct -x RespUnset -X "RespHeader:(x|X)-(url|host)" 
 	unset resp.http.x-url;
 	unset resp.http.x-host;
-	unset resp.http.xkey;
+#	unset resp.http.xkey;
 
 	## Vary to browser
 	set resp.http.Vary = "Accept-Encoding";

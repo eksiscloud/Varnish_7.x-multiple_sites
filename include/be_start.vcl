@@ -69,4 +69,8 @@ sub be_started {
 		set beresp.http.xkey = beresp.http.X-Cache-Tags;
 	}
 
+	    # Lisää URL-pohjainen xkey-tunniste
+            if (bereq.url ~ "^/") {
+                set beresp.http.xkey += ",url-" + bereq.url;
+            }
 }
