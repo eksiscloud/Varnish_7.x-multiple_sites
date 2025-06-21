@@ -66,12 +66,15 @@ sub wp {
         }
 
         # WordPress REST API
-	if (req.url ~ "/wp-json/wp/") {
-		if (req.http.Cookie ~ "wordpress_logged_in") {
-			return(pass);
-		}
-		return(synth(403, "Unauthorized request"));
-	}
+	if (req.url ~ "^/wp-json/wp/") {
+    if (req.http.Authorization) {
+        return (pass);
+    }
+    if (req.http.Cookie ~ "wordpress_logged_in") {
+        return (pass);
+    }
+    return (synth(403, "Unauthorized request"));
+}
 
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
