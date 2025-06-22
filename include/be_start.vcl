@@ -64,12 +64,22 @@ sub be_started {
 		}
 	}
 
+
+	## Show xkey tags
 	if (beresp.http.X-Cache-Tags) {
 		set beresp.http.xkey = beresp.http.X-Cache-Tags;
 	}
 
-	if (bereq.url ~ "^/" && beresp.http.xkey !~ "url-" + bereq.url) {
-		set beresp.http.xkey += ",url-" + bereq.url;
+	# Adding url- if it is there and trying to stop possible duplicates
+	# Must use temp header because a string can't be joined with regex-operator
+	if (bereq.url ~ "^/") {
+		set beresp.http.X-URL-CHECK = "url-" + bereq.url;
+
+		if (!std.strstr(beresp.http.xkey, beresp.http.X-URL-CHECK)) {
+			set beresp.http.xkey += ",url-" + bereq.url;
+		}
+
+		unset beresp.http.X-URL-CHECK;
 	}
 
 ## The end is here
