@@ -15,12 +15,14 @@ sub ban_purge-8 {
     }
 
     ## Use only allowed xkey-tags
-    if (!(
-        req.http.xkey-purge ~ "^url-" ||
-        req.http.xkey-purge ~ "^article-[0-9]+$" ||
-        std.strstr("frontpage,sidebar", req.http.xkey-purge)
-    )) {
-        return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
+    if (
+        req.http.xkey-purge !~ "^frontpage$" &&
+        req.http.xkey-purge !~ "^sidebar$" &&
+        req.http.xkey-purge !~ "^url-.*" &&
+        req.http.xkey-purge !~ "^article-[0-9]+$"
+       ) {
+	    std.log("⛔ Unknown xkey: " + req.http.xkey-purge);
+            return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
     }
 
     ## When BAN happens
@@ -34,12 +36,11 @@ sub ban_purge-8 {
         if (req.http.xkey-purge && req.http.xkey-purge ~ "^url-") {
             xkey.purge(req.http.xkey-purge);
             return(synth(200, "Hard purged: " + req.http.xkey-purge));
-        } else {
+        }
 
         # Soft fallback-purge
         ban("obj.http.xkey ~ " + req.http.xkey-purge);
         return(synth(200, "Soft purged: " + req.http.xkey-purge));
-        }
     }
 
     ## REFRESH or another PURGE
