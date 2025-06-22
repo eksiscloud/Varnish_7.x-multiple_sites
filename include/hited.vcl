@@ -2,30 +2,23 @@ sub hitit {
 
 	### Whole vcl_hit
 
-    if (obj.uncacheable) {
-        return (pass);
-    }
-
-    ## Normal hit
-    set req.http.x-cache = "hit";
-
-    ## Grace-hit: TTL is ended, but is under grace
-    if (obj.ttl <= 0s && obj.grace > 0s) {
-        std.log("🟡 HIT grace: " + req.url);
-        set req.http.x-cache = "hit graced";
+    ## Pure hit
+    if (obj.ttl >= 0s) {
+        set req.http.x-cache = "hit";
         return (deliver);
     }
 
-    ## Banned or totally stale
-    if (obj.ttl <= 0s && obj.grace <= 0s) {
-        std.log("💥 Banned HIT: " + req.url +
-            " — xkey: " + obj.http.xkey +
-            " — UA: " + req.http.User-Agent);
-        # Get a fresh copy
-        return (miss);
+    ## Out of TTL, but is under grace
+    if (obj.ttl <= 0s && obj.grace > 0s) {
+        set req.http.x-cache = "hit graced";
+        std.log("🟡 HIT grace: " + req.url);
+        return (deliver);
     }
 
-    return (deliver);
+    ## Banned or badly stale
+    std.log("💥 Banned HIT, fetch fresh copy: " + req.url);
+    return (pass);
+
 
 ## The end of this road
 }
