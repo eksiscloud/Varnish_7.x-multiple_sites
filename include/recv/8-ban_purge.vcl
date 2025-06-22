@@ -1,4 +1,4 @@
-sub ban_purge {
+sub ban_purge-8 {
  
    
    if (req.method != "BAN" && req.method != "PURGE" && req.method != "REFRESH") {
