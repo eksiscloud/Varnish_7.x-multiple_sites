@@ -4,15 +4,15 @@
 case "$1" in
   example)
     DOMAIN="www.example.com"
-    TARGET_DIR="/var/www/emergency/example/$DOMAIN"
+    TARGET_DIR="/var/www/emergency/example"
     ;;
   try)
     DOMAIN="try.example.tld"
-    TARGET_DIR="/var/www/emergency/try/$DOMAIN"
+    TARGET_DIR="/var/www/emergency/try"
     ;;
   third)
     DOMAIN="www.example.invalid"
-    TARGET_DIR="/var/www/emergency/third/$DOMAIN"
+    TARGET_DIR="/var/www/emergency/third"
     ;;
   *)
     echo "❌ Unknown site: $1"
