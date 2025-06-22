@@ -38,9 +38,9 @@ sub normalize-4 {
                 }
         }
 
-        ## Let's tune up a bit behavior for healthy backends: Cap grace to 12 hours
+        ## Let's tune up a bit behavior for healthy backends: I use long TTLs and snapshot-backend
         if (std.healthy(req.backend_hint)) {
-                set req.grace = 43200s;
+                set req.grace = 30s;
         }
 
 	## X-Bypass-Cache needs...
