@@ -64,13 +64,13 @@ sub be_started {
 		}
 	}
 
-	## xkey for smarter PURGE
 	if (beresp.http.X-Cache-Tags) {
 		set beresp.http.xkey = beresp.http.X-Cache-Tags;
 	}
 
-	    # Lisää URL-pohjainen xkey-tunniste
-            if (bereq.url ~ "^/") {
-                set beresp.http.xkey += ",url-" + bereq.url;
-            }
+	if (bereq.url ~ "^/" && beresp.http.xkey !~ "url-" + bereq.url) {
+		set beresp.http.xkey += ",url-" + bereq.url;
+	}
+
+## The end is here
 }
