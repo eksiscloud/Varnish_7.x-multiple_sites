@@ -10,18 +10,17 @@ sub ban_purge-8 {
         return(synth(405, "Forbidden"));
     }
 
-    if (!req.http.X-Cache-Tags) {
-        return(synth(400, "Missing X-Cache-Tags"));
+    if (!req.http.xkey-purge) {
+        return(synth(400, "Missing xkey"));
     }
 
     ## Use only allowed xkey-tags
-    if (
-        req.http.X-Cache-Tags !~ "^frontpage$" &&
-        req.http.X-Cache-Tags !~ "^sidebar$" &&
-        req.http.X-Cache-Tags !~ "^url-.*" &&
-        req.http.X-Cache-Tags !~ "^article-[0-9]+$"
-    ) {
-        return(synth(404, "Unknown xkey tag"));
+    if (!(
+        req.http.xkey-purge ~ "^url-" ||
+        req.http.xkey-purge ~ "^article-[0-9]+$" ||
+        std.strstr("frontpage,sidebar", req.http.xkey-purge)
+    )) {
+        return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
     }
 
     ## When BAN happens
@@ -35,11 +34,12 @@ sub ban_purge-8 {
         if (req.http.xkey-purge && req.http.xkey-purge ~ "^url-") {
             xkey.purge(req.http.xkey-purge);
             return(synth(200, "Hard purged: " + req.http.xkey-purge));
-        }
+        } else {
 
         # Soft fallback-purge
-        ban("obj.http.X-Cache-Tags ~ " + req.http.xkey-purge);
+        ban("obj.http.xkey ~ " + req.http.xkey-purge);
         return(synth(200, "Soft purged: " + req.http.xkey-purge));
+        }
     }
 
     ## REFRESH or another PURGE
