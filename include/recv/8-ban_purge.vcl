@@ -19,16 +19,19 @@ sub ban_purge-8 {
         req.http.xkey-purge !~ "^frontpage$" &&
         req.http.xkey-purge !~ "^sidebar$" &&
         req.http.xkey-purge !~ "^url-.*" &&
-        req.http.xkey-purge !~ "^article-[0-9]+$"
-       ) {
-	    std.log("⛔ Unknown xkey: " + req.http.xkey-purge);
-            return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
+        req.http.xkey-purge !~ "^article-[0-9]+$" &&
+        req.http.xkey-purge !~ "^domain-[a-z0-9-]+$"&&
+        req.http.xkey-purge !~ "^tag-[a-z0-9-]+$" &&
+        req.http.xkey-purge !~ "^category-[a-z0-9-]+$"
+    ) {
+        std.log("⛔ Unknown xkey: " + req.http.xkey-purge);
+        return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
     }
 
     ## When BAN happens
     if (req.method == "BAN") {
-        ban("obj.http.xkey ~ " + req.http.X-Cache-Tags);
-        return(synth(200, "Banned: " + req.http.X-Cache-Tags));
+        ban("obj.http.xkey ~ " + req.http.xkey-purge);
+        return(synth(200, "Banned: " + req.http.xkey-purge));
     }
 
     # Using hard PURGE for xkey-urls
@@ -37,6 +40,10 @@ sub ban_purge-8 {
             xkey.purge(req.http.xkey-purge);
             return(synth(200, "Hard purged: " + req.http.xkey-purge));
         }
+	if (req.http.xkey-purge && req.http.xkey-purge ~ "^domain-") {
+            xkey.purge(req.http.xkey-purge);
+            return(synth(200, "Hard purged: " + req.http.xkey-purge));
+	}
 
         # Soft fallback-purge
         ban("obj.http.xkey ~ " + req.http.xkey-purge);
