@@ -241,7 +241,9 @@ sub vcl_recv {
 	
 	## Ban & Purge
 	# include/ban_purge.vcl
-	call ban_purge-8;
+	if (req.method == "BAN" || req.method == "PURGE") {
+		call ban_purge-8;
+	}
 	
 	## Setup CORS
 	# ext/cors.vcl

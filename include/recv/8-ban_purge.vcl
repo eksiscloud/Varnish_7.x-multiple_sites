@@ -1,10 +1,6 @@
 sub ban_purge-8 {
  
    
-   if (req.method != "BAN" && req.method != "PURGE" && req.method != "REFRESH") {
-        return;
-    }
-
     ## Normal no-go rules
     if (req.http.X-Bypass != "true") {
         return(synth(405, "Forbidden"));
