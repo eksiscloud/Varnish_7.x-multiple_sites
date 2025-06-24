@@ -1,33 +1,34 @@
 #!/bin/bash
 
-# Hae ajantasaiset muistiarvot
-current_bytes=$(varnishstat -1 -f SMA.s0.g_bytes | awk '{print $2}')
-available_bytes=$(varnishstat -1 -f SMA.s0.g_space | awk '{print $2}')
+# Haetaan mallocin käytössä oleva ja vapaa muisti
+used_bytes=$(varnishstat -1 -f SMA.s0.g_bytes | awk '{print $2}')
+free_bytes=$(varnishstat -1 -f SMA.s0.g_space | awk '{print $2}')
 
-# Lasketaan kokonaisvarattu muistialue (käytetty + vapaa)
-total_bytes=$(echo "$current_bytes + $available_bytes" | bc)
-
-# Muunnetaan GiB-yksikköihin
-current_gb=$(echo "scale=2; $current_bytes / 1024 / 1024 / 1024" | bc)
-available_gb=$(echo "scale=2; $available_bytes / 1024 / 1024 / 1024" | bc)
-total_gb=$(echo "scale=2; $total_bytes / 1024 / 1024 / 1024" | bc)
+# Lasketaan kokonaismäärä
+total_bytes=$(echo "$used_bytes + $free_bytes" | bc)
 
 # Lasketaan käyttöaste prosentteina
-usage_percent=$(echo "scale=1; 100 * $current_bytes / $total_bytes" | bc)
+usage_percent=$(echo "scale=1; 100 * $used_bytes / $total_bytes" | bc)
 
-# Haetaan objektien määrä (jos saatavilla)
-object_count=$(varnishstat -1 -f SMA.s0.g_alloc 2>/dev/null | awk '{print $2}')
+# Muunnetaan GiB-yksiköihin
+used_gb=$(echo "scale=2; $used_bytes / 1024 / 1024 / 1024" | bc)
+free_gb=$(echo "scale=2; $free_bytes / 1024 / 1024 / 1024" | bc)
+total_gb=$(echo "scale=2; $total_bytes / 1024 / 1024 / 1024" | bc)
 
-# Tulostetaan yhteenveto
+# Tulostus
 echo
-echo "Varnish Cache - memory usage (malloc backend):"
-echo "-----------------------------------------------"
-echo "Memory in use:             ${current_gb} GiB (${usage_percent} % of pool)"
-echo "Memory still available:    ${available_gb} GiB"
-echo "Total malloc pool size:    ${total_gb} GiB"
+echo "Varnish malloc memory usage:"
+echo "----------------------------"
+printf "  Used memory:       %.2f GiB (%.1f %% of pool)\n" "$used_gb" "$usage_percent"
+printf "  Free memory:       %.2f GiB\n" "$free_gb"
+printf "  Total pool size:   %.2f GiB\n" "$total_gb"
+echo
 
-if [[ -n "$object_count" ]]; then
-    echo "Currently cached objects:  $object_count"
+# Suositus (heuristinen)
+if (( $(echo "$usage_percent < 20" | bc -l) )); then
+    echo "💡 Käyttöaste on alhainen. Voit todennäköisesti pienentää malloc-poolin kokoa."
 else
-    echo "Object count is not available."
+    echo "✅ Käyttöaste vaikuttaa perustellulta nykyiseen kokoon nähden."
 fi
+
+echo
