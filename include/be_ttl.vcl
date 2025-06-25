@@ -15,7 +15,7 @@ sub be_ttled {
 		# Varnish will keep cache very long time. Most of content never changes.
 		# there will be systen reboot, Varnish restarts and cache warmer and all those changes and refreshes
 		# the actual cache no matter this setting
-                set beresp.ttl = 1y;
+                set beresp.ttl = 52w;
 
 		# 24h for browsers, 365d for Varnish and beresp.ttl is kind of fallback, if s-maxage is missing
 		set beresp.http.Cache-Control = "public, max-age=86400, s-maxage=31536000;";
@@ -61,7 +61,7 @@ sub be_ttled {
 		unset beresp.http.Cache-Control;
 		# Must set, because default is only for 200
 		set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
-		set beresp.ttl = 1y;
+		set beresp.ttl = 52w;
 	}
 
 	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
