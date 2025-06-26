@@ -22,7 +22,7 @@ c_freed=$(varnishstat -1 -f "$sma_pool.c_freed" | awk '{print $2}')
 
 # Amount of objects and expired
 n_object=$(varnishstat -1 -f MAIN.n_object 2>/dev/null | awk '{print $2}')
-s_expired=$(varnishstat -1 -f MAIN.s_expired 2>/dev/null | awk '{print $2}')
+n_expired=$(varnishstat -1 -f MAIN.n_expired 2>/dev/null | awk '{print $2}')
 
 # If missing obligatory values
 if [[ -z "$g_bytes" || -z "$g_space" ]]; then
@@ -43,14 +43,14 @@ else
 fi
 
 # If there isn't value for expired
-if [[ -z "$s_expired" ]]; then
-    s_expired=0
+if [[ -z "$n_expired" ]]; then
+    n_expired=0
 fi
 
 # CSV-header (writing only if not exist)
 if [[ ! -f "$LOGFILE" ]]; then
-    echo "timestamp,g_bytes,g_space,total_bytes,usage_percent,n_object,avg_object_size,c_bytes,c_freed,s_expired" > "$LOGFILE"
+    echo "timestamp,g_bytes,g_space,total_bytes,usage_percent,n_object,avg_object_size,c_bytes,c_freed,n_expired" > "$LOGFILE"
 fi
 
 # CSV-line
-echo "$timestamp,$g_bytes,$g_space,$total_bytes,$usage_percent,$n_object,$avg_object_size,$c_bytes,$c_freed,$s_expired" >> "$LOGFILE"
+echo "$timestamp,$g_bytes,$g_space,$total_bytes,$usage_percent,$n_object,$avg_object_size,$c_bytes,$c_freed,$n_expired" >> "$LOGFILE"
