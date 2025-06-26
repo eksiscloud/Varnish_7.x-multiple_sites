@@ -39,11 +39,11 @@ sub be_ttled {
 	call conditional410;
 
         ## Cache for not found, only short period
-        if (beresp.status == 404) {
-                unset beresp.http.Cache-Control;
-		set beresp.http.Cache-Control = "public, max-age=120";
-                set beresp.ttl = 120s;
-        }
+        #if (beresp.status == 404) {
+        #        unset beresp.http.Cache-Control;
+	#	set beresp.http.Cache-Control = "public, max-age=120";
+        #        set beresp.ttl = 120s;
+        #}
 
 	## 301 and 410 are quite steady, again, so let Varnish cache results from backend
 	# The idea here must be that first try doesn't go in cache, so let's do another round 
@@ -91,7 +91,7 @@ sub be_ttled {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
-                set beresp.ttl = 1d;
+                set beresp.ttl = 52w;
                 unset beresp.http.set-cookie;
         }
 
@@ -117,7 +117,7 @@ sub be_ttled {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
-                set beresp.ttl = 2d; # users may need longer than is requested from cache
+                set beresp.ttl = 4w; # users may need longer than is requested from cache
                 set beresp.do_stream = true;
 	}
 
@@ -156,18 +156,18 @@ sub be_ttled {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
-                set beresp.ttl = 1d;
+                set beresp.ttl = 4w;
         }
 
         ## Search results, mostly Wordpress
         # Normally those querys should pass but I want to cache answers shortly
         # Caching or not doesn't matter because users don't search too often anyway
-        if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
-		unset beresp.http.set-cookie;
-                unset beresp.http.Cache-Control;
-                set beresp.http.Cache-Control = "public, max-age=120";
-                set beresp.ttl = 5m;
-        }
+        #if (bereq.url ~ "/\?s=" || bereq.url ~ "/search/") {
+	#	unset beresp.http.set-cookie;
+        #        unset beresp.http.Cache-Control;
+        #        set beresp.http.Cache-Control = "public, max-age=120";
+        #        set beresp.ttl = 5m;
+        #}
 		
 
 }
