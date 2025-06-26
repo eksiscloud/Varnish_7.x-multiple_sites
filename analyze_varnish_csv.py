@@ -32,7 +32,7 @@ ax2.tick_params(axis="y", labelcolor="tab:green")
 
 ax3 = ax1.twinx()
 ax3.spines["right"].set_position(("outward", 60))
-ax3.plot(df["timestamp"], df["expired_objects"], color="tab:red", label="Expired objects", marker='x')
+ax3.plot(df["timestamp"], df["expired_objects"], color="tab:red", label="Expired object change", marker='x')
 ax3.set_ylabel("Expired objects", color="tab:red")
 ax3.tick_params(axis="y", labelcolor="tab:red")
 
