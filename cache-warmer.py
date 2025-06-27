@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
+
+# Usage: ./cache-warmer.py <nickname> [COUNTRY CODE]
+
 import requests
 import subprocess
 import tempfile
 import datetime
 import sys
 import time
+from bs4 import BeautifulSoup
 
-MATOMO_API_URL = "https://matomo/index.php"
-TOKEN = "<long-api-key"  # give right token
+MATOMO_API_URL = "YOUR-MATOMO"
+TOKEN = "API-KEY"
 
-#  nickname - Matomo ID - url
+# Add your sites
 SITES = {
-    "example": {"id": 1, "domain": "www.example.com"},
-    "try": {"id": 15, "domain": "try.example.tld"},
-    "third": {"id": 9, "domain": "example.invalid"},
+    "katiska": {"id": 1, "domain": "www.katiska.eu"},
+    "poochie": {"id": 15, "domain": "www.poochierevival.info"},
+    "eksis": {"id": 2, "domain": "www.eksis.one"},
+    "jagster": {"id": 17, "domain": "jagster.eksis.one"},
+    "dev": {"id": 11, "domain": "dev.eksis.one"},
 }
 
+# Change if needed
 HEADERS = {
-    "User-Agent": "CacheWarmer/1.0"
+    "User-Agent": "CacheWarmer/1.1",
+    "Accept": "*/*",
+    "X-Bypass": "false"
 }
 
 def matomo_api_call(params, max_retries=3, timeout=20):
@@ -27,7 +36,7 @@ def matomo_api_call(params, max_retries=3, timeout=20):
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"[Error] Matomo API-request failed (try {attempt+1}/{max_retries}): {e}")
+            print(f"[Error] Matomo API-request failed (attwmpt {attempt+1}/{max_retries}): {e}")
             time.sleep(2)
     return []
 
@@ -39,14 +48,14 @@ def get_top_urls(site_id, start_date, end_date, country=None):
         "period": "range",
         "date": f"{start_date},{end_date}",
         "format": "JSON",
-        "filter_limit": "200", # should be top-200; doesn't work
+        "filter_limit": "400",
         "token_auth": TOKEN,
     }
 
     if country:
         params["segment"] = f"countryCode=={country}"
 
-    print("Getting main URLs from Matomo")
+    print("⏳ Getting main URLs from Matomo...")
     data = matomo_api_call(params)
     urls = []
 
@@ -72,38 +81,65 @@ def get_top_urls(site_id, start_date, end_date, country=None):
 def ban_and_warm(domain, urls):
     warmed_urls = []
 
-    for path in urls:
+    for idx, path in enumerate(urls):
         if not path.startswith("/"):
-            path = "/" + path
-        full_url = f"https://{domain}{path}"
+            path = "/" + path.rstrip("/") + "/"
+        full_url = f"https://{domain}/{path.lstrip('/')}"
 
+	# First happens hard PURGE to be sure we have fresk copy (BAN would fill up ban.list)
         print(f"📛 BANNING: {path}")
+        headers = {
+            "xkey-purge": f"url-{path}",
+            "X-Bypass": "true",
+            "User-Agent": "CacheWarmer/1.1"
+        }
         try:
-            subprocess.run([
-                "varnishadm", "-S", "/etc/varnish/secret",
-                "-T", "localhost:6082", "ban", f'req.url ~ "^{path}"'
-            ], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"[Virhe] {full_url}: Varnish ban failed: {e}")
+            response = requests.request("PURGE", full_url, headers=headers, timeout=10)
+            print(f"✅ PURGED: {path}" if response.status_code == 200 else f"📛 PURGE FAILED: {path} → {response.status_code} {response.reason}")
+        except requests.exceptions.RequestException as e:
+            print(f"[Error] PURGE-reguest failed: {e}")
             continue
 
+        # Getting a fresh one from backend
+        print(f"🚀 FETCHING: {full_url}")
+        headers_fetch = {
+            "User-Agent": "CacheWarmer/1.1",
+            "X-Bypass": "true",
+        }
         try:
-            subprocess.run([
-                "curl", "-s",
-                "-H", "X-Bypass-Cache: 1",
-                "-H", "User-Agent:CacheWarmer",
-                full_url
-            ], stdout=subprocess.DEVNULL, check=True)
-            print(f"🚀 FETCHING: {full_url}\n")
+            get_response = requests.get(full_url, headers=headers_fetch, timeout=10)
+            print(f"← GET {get_response.status_code}: {get_response.reason}")
+            print(f"← X-Cache: {get_response.headers.get('x-cache', 'ei headeria')}")
             warmed_urls.append(full_url)
-        except subprocess.CalledProcessError as e:
-            print(f"[Virhe] {full_url}: Fetch failed: {e}")
+
+            # assets from only the first 3 hits, those are same anyway
+            if idx < 3:
+                soup = BeautifulSoup(get_response.text, 'html.parser')
+                asset_urls = set()
+
+                for tag in soup.find_all(["link", "script", "img"]):
+                    url = tag.get("href") or tag.get("src")
+                    if url and (url.endswith((".css", ".js", ".woff", ".woff2", ".ttf", ".otf", ".eot", ".svg", ".png", ".jpg", ".jpeg", ".gif", ".webp"))):
+                        if url.startswith("/"):
+                            asset_urls.add(f"https://{domain}{url}")
+                        elif url.startswith("http"):
+                            asset_urls.add(url)
+
+                for asset in asset_urls:
+                    try:
+                        response = requests.get(asset, headers=headers_fetch, timeout=10)
+                        print(f"    ↳ Asset {asset} → {response.status_code}")
+                    except Exception as e:
+                        print(f"[Error] Getting an asset failed: {e}")
+
+        except Exception as e:
+            print(f"[Virhe] GET-request failed: {e}")
 
     return warmed_urls
 
 def main():
     if len(sys.argv) < 2:
-        print("Käyttö: ./cache-warmer.py <nickname> [COUNTRY-CODE]")
+        print("Usage: ./cache-warmer.py <nickname> [COUNTRY CODE]")
         sys.exit(1)
 
     site_name = sys.argv[1]
@@ -114,7 +150,7 @@ def main():
     country = sys.argv[2] if len(sys.argv) > 2 else None
 
     today = datetime.date.today()
-    start = today - datetime.timedelta(days=30) # sets timeframe
+    start = today - datetime.timedelta(days=45)
     end = today
 
     site = SITES[site_name]
@@ -123,22 +159,22 @@ def main():
     urls = get_top_urls(site["id"], start.isoformat(), end.isoformat(), country)
 
     if not urls:
-        print("⚠️   Couldn' t find any URLs!")
+        print("⚠️   No URL couldn't find")
         sys.exit(1)
 
     with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
         for path in urls:
             if not path.startswith("/"):
-                path = "/" + path
-            full_url = f"https://{domain}{path}"
+                path = path.rstrip("/") + "/"
+            full_url = f"https://{domain}/{path.lstrip('/')}"
             tmp_file.write(full_url + "\n")
         tmp_filename = tmp_file.name
 
-    print(f"URL-list saved: {tmp_filename}")
-    print(f"🔥 Warming up cache for {len(urls)} URLs...\n")
+    print(f"📄 URL-list saved: {tmp_filename}")
+    print(f"🔥 Warming up cache using  {len(urls)} URLs...\n")
 
     warmed = ban_and_warm(domain, urls)
-    print(f"\n✅ Done. {len(warmed)} URLs warmed up from the backend.")
+    print(f"\n✅ Ready. {len(warmed)} URLs from backend is used for cache warming.")
 
 if __name__ == "__main__":
     main()
