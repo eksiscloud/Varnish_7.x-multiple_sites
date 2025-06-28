@@ -81,21 +81,6 @@ Nginx do the work and Varnish is just a backup. There is an example how to do fi
 
 Nowadays all my sites behind Varnish are WordPresses, so all site-vcls are identical. There is one WooCommerce, and it does some WC-stuff, but after all it is WordPress too.
 
-### Certbot crashes Ngnix
-`certbot renew` can't shutdown and restart Nginx right. Certbot shall shutdown Nginx first and 
-after that it tries read nginx.pid and it is not there anymore. That situation is quite common reason for crashed
-Nginx because ports are in use by ghost-Nginx. Then you have to do `killall nginx` and after that
-`systemctl restart nginx`. When you have backend on dedicated VPS, not as 127.0.0.1, you can't use
---standalone or --webroot either - you are stuck on --nginx even that is the issue.
-
-To fix that you need to
-* remove all post/pre settings if such exists (/etc/letsencrypt/cli.ini and renewal/*.host)
-* upgrade certbot to version 1.x
-* never use crontab to renew certificates; there is system-timer for that
-* do pipe; for certbot at very early stage on default.vcl
-
-HEADS UP: I don't think anything of that is really issue anymore. it has fixed now, I reckon. When installed using snap such issues vanished.
-
 ## Known limitations
 
 * `varnishd -C -f /etc/varnish/default.vcl` doesn't work.
