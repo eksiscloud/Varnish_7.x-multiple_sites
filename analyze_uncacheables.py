@@ -2,54 +2,70 @@
 
 # First:
 # varnishlog -g request -i BereqURL,BerespStatus,BerespHeader,VCL_call,VCL_return > /tmp/varnishlog.txt
+# varnishlog -g request -i BereqURL,BerespHeader,BerespStatus,VCL_call,VCL_return | /tmp/varnishlog.txt
 
-import re
+import sys
 from collections import defaultdict
 
-# Syötetiedoston nimi
-logfile = "/tmp/varnishlog.txt"
+# ./analyze_uncacheables.py < /tmp/varnishlog.txt
+uncacheable_entries = []
+current_url = None
+current_block = []
+inside_request = False
 
-# Tiedonkeruu
-uncacheable_reasons = defaultdict(list)
+for line in sys.stdin:
+    line = line.strip()
 
-with open(logfile, encoding="utf-8") as f:
-    current_url = None
-    current_reason = set()
-    for line in f:
-        line = line.strip()
+    if line.startswith("*   << Request"):
+        inside_request = True
+        current_block = []
+        current_url = None
+
+    elif inside_request:
+        current_block.append(line)
 
         if line.startswith("-- BereqURL"):
             current_url = line.split(None, 1)[1]
-            current_reason = set()
 
-        elif "Set-Cookie" in line:
-            if current_url:
-                current_reason.add("Set-Cookie")
+        elif line.startswith("**  << BeReq") or line.startswith("*   << Request  >>"):
+            continue  # jatketaan
 
+        elif line.startswith("**  <<"):
+            # Uusi lohko -> käsittele vanha
+            inside_request = False
+            for l in current_block:
+                if "beresp.uncacheable = true" in l:
+                    uncacheable_entries.append((current_url, list(current_block)))
+            current_block = []
+
+# Analyysi syistä
+reason_summary = defaultdict(int)
+reason_by_url = defaultdict(list)
+
+for url, block in uncacheable_entries:
+    reason = []
+
+    for line in block:
+        if "Set-Cookie" in line:
+            reason.append("Set-Cookie")
         elif "Cache-Control" in line and "no-store" in line:
-            if current_url:
-                current_reason.add("no-store")
+            reason.append("Cache-Control: no-store")
+        elif "return(pass)" in line:
+            reason.append("return(pass)")
+        elif "return(pipe)" in line:
+            reason.append("return(pipe)")
+        elif "beresp.uncacheable = true" in line:
+            reason.append("uncacheable")
 
-        elif line.startswith("-- VCL_call") and "BACKEND_RESPONSE" in line:
-            # Kun BACKEND_RESPONSE saapuu, talletetaan tiedot
-            for reason in current_reason:
-                uncacheable_reasons[reason].append(current_url)
-            current_url = None
-            current_reason = set()
+    final_reason = ", ".join(sorted(set(reason))) if reason else "tuntematon"
+    reason_summary[final_reason] += 1
+    reason_by_url[url].append(final_reason)
 
-# Tulostus
-print("📊 Uncacheable yhteenveto:\n")
+# Tulosta yhteenveto
+print("== YHTEENVETO ==")
+for reason, count in reason_summary.items():
+    print(f"{reason}: {count} kpl")
 
-total = 0
-for reason, urls in uncacheable_reasons.items():
-    print(f"{reason}: {len(urls)} kpl")
-    total += len(urls)
-
-print(f"\nYhteensä: {total} uncacheable vastausta.\n")
-
-# Yksityiskohtaiset URL:t (valinnainen)
-print("🔍 Esimerkkejä uncacheable URL:ista:")
-for reason, urls in uncacheable_reasons.items():
-    print(f"\n⟶ {reason}:")
-    for url in sorted(set(urls))[:10]:  # max 10 / syy
-        print(f"   - {url}")
+print("\n== Yksittäiset URL:t ja syyt ==")
+for url, reasons in reason_by_url.items():
+    print(f"{url} → {', '.join(reasons)}")
