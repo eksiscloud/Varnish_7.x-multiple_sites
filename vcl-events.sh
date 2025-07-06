@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OUTDIR="/var/log/varnish-vcl"
+OUTDIR="/var/log/varnish/varnish-vcl"
 OUTFILE="$OUTDIR/vcl-$(date +%Y-%m-%d_%H%M).log"
 
 mkdir -p "$OUTDIR"
