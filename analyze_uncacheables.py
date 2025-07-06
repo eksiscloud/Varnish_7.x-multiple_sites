@@ -28,17 +28,17 @@ for line in sys.stdin:
             current_url = line.split(None, 1)[1]
 
         elif line.startswith("**  << BeReq") or line.startswith("*   << Request  >>"):
-            continue  # jatketaan
+            continue
 
         elif line.startswith("**  <<"):
-            # Uusi lohko -> käsittele vanha
+            # New block -> process old one
             inside_request = False
             for l in current_block:
                 if "beresp.uncacheable = true" in l:
                     uncacheable_entries.append((current_url, list(current_block)))
             current_block = []
 
-# Analyysi syistä
+# Analyze
 reason_summary = defaultdict(int)
 reason_by_url = defaultdict(list)
 
@@ -57,15 +57,15 @@ for url, block in uncacheable_entries:
         elif "beresp.uncacheable = true" in line:
             reason.append("uncacheable")
 
-    final_reason = ", ".join(sorted(set(reason))) if reason else "tuntematon"
+    final_reason = ", ".join(sorted(set(reason))) if reason else "unkown"
     reason_summary[final_reason] += 1
     reason_by_url[url].append(final_reason)
 
-# Tulosta yhteenveto
-print("== YHTEENVETO ==")
+# Summary
+print("== SUMMARY ==")
 for reason, count in reason_summary.items():
-    print(f"{reason}: {count} kpl")
+    print(f"{reason}: {count} times")
 
-print("\n== Yksittäiset URL:t ja syyt ==")
+print("\n== Individual URLs and reasons ==")
 for url, reasons in reason_by_url.items():
     print(f"{url} → {', '.join(reasons)}")
