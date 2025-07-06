@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 
+# Varnish must detect user agents and log bots using BOT_DETECTED
+
 import subprocess
 from collections import Counter
 import re
 
-# Ajetaan varnishlog suoraan ja haetaan BOT_DETECTED rivit
+# Finding BOT_DETECTED from varnishlog
 cmd = [
     "varnishlog",
     "-g", "request",
     "-q", 'VCL_Log ~ "BOT_DETECTED"',
-    "-n", "default",  # Vaihda jos eri nimi
-    "-d", "-t", "1800"   # Kerää 60 sekunnin ajan
+    "-n", "varnishd",  # change if/when different workdir
+    "-d", "-t", "1800"   # Collecting 60 seconds
 ]
 
-print("Analysoidaan BOT_DETECTED-pyyntöjä asetusten ajan mukaan...")
+print("Analyzing BOT_DETECTED-requests...")
 
-# Ajetaan varnishlog ja parsitaan IP:t
+# Using varnishlog and parsing IPs
 proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
 
 ip_pattern = re.compile(r'BOT_DETECTED.*IP=(\d+\.\d+\.\d+\.\d+)')
@@ -23,9 +25,9 @@ ips = ip_pattern.findall(proc.stdout)
 
 counter = Counter(ips)
 
-# Näytä tulokset ja ehdota estoa
+# Show resutls and suggest banning
 for ip, count in counter.items():
     if count >= 3:
-        print(f"🚨 IP {ip} havaittu {count} kertaa viimeisen minuutin aikana. Kannattaa harkita estoa.")
+        print(f"🚨 IP {ip} detected {count} times inside udes timeframe. Perhaps it should be banned.")
     else:
-        print(f"IP {ip} havaittu {count} kertaa — ei reaktiota.")
+        print(f"IP {ip} detected {count} kertaa — no need to react.")
