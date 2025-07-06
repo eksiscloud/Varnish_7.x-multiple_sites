@@ -109,7 +109,7 @@ sub be_ttled {
                 set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
                 set beresp.ttl = 1w;
         }
-        if (req.url ~ "^/(nodeinfo|webfinger)") {
+        if (bereq.url ~ "^/(nodeinfo|webfinger)") {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
