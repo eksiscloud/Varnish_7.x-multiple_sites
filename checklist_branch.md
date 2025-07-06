@@ -1,4 +1,6 @@
 # ✅ Git-Branch Harjoitus: ASN-suodatuksen refaktorointi
+# Sorry, this one is in Finnish, but it is for me - because I'm really bad at git.
+# This shows only how to use branches
 
 Tämä muistilista opastaa yhden Git-branchin käytön läpi, käytännön esimerkkinä ASN-nimiin perustuvan Varnish-eston poistaminen ja yhdistäminen ASN-ID-logiikkaan.
 
@@ -8,7 +10,7 @@ Tämä muistilista opastaa yhden Git-branchin käytön läpi, käytännön esime
 
 1. Siirry projektihakemistoon:
    ```bash
-   cd /path/to/your/varnish-repo
+   cd /etc/varnish
    ```
 
 2. Tarkista tilanne:
