@@ -96,6 +96,26 @@ sub be_ttled {
                 set beresp.ttl = 52w;
 	}
 
+        ## Mastodon/ActivityPub aren't active
+        if (bereq.url ~ "^/wp-json/activitypub/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
+                set beresp.ttl = 1w;
+        }
+        if (bereq.url ~ "^/api/(v1|v2)/") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
+                set beresp.ttl = 1w;
+        }
+        if (req.url ~ "^/(nodeinfo|webfinger)") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
+                set beresp.ttl = 4w;
+        }
+
 	# Fonts don't change, is needed everywhere and are small
         if (bereq.http.Content-Type ~ "^font/") {
                 unset beresp.http.Cache-Control;
