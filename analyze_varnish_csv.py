@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# It draws a graph from logged memory usage and change of stored objects
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import sys
@@ -10,15 +13,15 @@ if len(sys.argv) != 3:
 csv_path = sys.argv[1]
 output_path = sys.argv[2]
 
-# Lue CSV
+# Read CSV
 df = pd.read_csv(csv_path, parse_dates=["timestamp"])
 
-# Lasketaan sarakkeet
+# Do math for colums
 df["g_bytes_MB"] = df["g_bytes"] / (1024 * 1024)
 df["cumulative_growth_MB"] = (df["c_bytes"] - df["c_freed"]) / (1024 * 1024)
 df["expired_objects"] = df["n_expired"].diff().fillna(0)
 
-# Piirretään
+# Drawing
 fig, ax1 = plt.subplots(figsize=(14, 7))
 
 ax1.plot(df["timestamp"], df["g_bytes_MB"], color="tab:blue", label="Memory in use (MiB)", marker='o')
@@ -41,6 +44,6 @@ fig.tight_layout()
 plt.xticks(rotation=45)
 plt.grid(True)
 
-# Tallenna kuva tiedostoksi
+# Save image
 plt.savefig(output_path, dpi=150)
 print(f"Saved plot to {output_path}")
