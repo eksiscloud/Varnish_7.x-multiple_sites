@@ -35,46 +35,27 @@ sub wp {
                 return(pass);
         }
 
-        ## Must Use plugins I reckon
-        if (req.url ~ "/mu-.*") {
-                return(pass);
-        }
-		
 	## Adsense incomings are lower when Varnish is on, trying to solve out this
 	# is it because of caching or CSP-rules?
 	if (req.url ~ "adsbygoogle") {
 		return(pass);
 	}
-
-        ## REST API 
-        # I don't want to fill RAM for benefits of bots.
         
-        # Mastodon/ActivityPub
-        if (req.url ~ "^/wp-json/(activitypub|friends)/") {
-                return(pass);
-        }
-	if (req.url ~ "^/api/(v1|v2)/") {
-		return(pass);
-	}
-	if (req.url ~ "^/(nodeinfo|webfinger)") {
-		return(pass);
-	}
-	
 	# .well-known API route should not be cached
         if (req.url ~ "^/.well-known/") {
                 return(pass);
         }
 
-        # WordPress REST API
+        ## WordPress REST API
 	if (req.url ~ "^/wp-json/wp/") {
-    if (req.http.Authorization) {
-        return (pass);
-    }
-    if (req.http.Cookie ~ "wordpress_logged_in") {
-        return (pass);
-    }
-    return (synth(403, "Unauthorized request"));
-}
+            if (req.http.Authorization) {
+                return (pass);
+            }
+            if (req.http.Cookie ~ "wordpress_logged_in") {
+                return (pass);
+            }
+            return (synth(403, "Unauthorized request"));
+	}
 
 	## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
@@ -86,7 +67,7 @@ sub wp {
 		set req.url = std.querysort(req.url);
 	}
 
-	# Text-files are static, so cache it is.
+	## Text-files are static, so cache it is.
 	# Cache these is equally stupid than caching images, though.
 	# This includes sitemaps, so consider smart TTL and remember: the order matters
         if (req.http.Content-Type ~ "text/") {
@@ -94,19 +75,31 @@ sub wp {
                 return(hash);
         }
 
-	# Fonts, another useless caching strategy
+	## Fonts, another useless caching strategy
         if (req.http.Content-Type ~ "font/") {
                 unset req.http.cookie;
                 return(hash);
         }
 
-	# Feeds should be cached, but on other side: only bots use them
-        if (req.http.Content-Type ~ "(application|text)/xml") {
+	## Feeds should be cached, but on other side: only bots use them
+        #if (req.http.Content-Type ~ "(application|text)/xml") {
+        #        unset req.http.cookie;
+        #        return(hash);
+	#}
+
+	## Podcast feeds
+        if (req.url ~ "^/feed/podcast/[^/]+/?$") {
                 unset req.http.cookie;
                 return(hash);
-	}
+        }
 
-	# JavaScript are operating in user's device, so caching them is no issue. 
+        # WordPress article/RSS-feeds (legacy stuff, not in use)
+        if (req.url ~ "^/.+/.+/feed/?$") {
+                unset req.http.cookie;
+                return(hash);
+        }
+
+	## JavaScript are operating in user's device, so caching them is no issue. 
 	# But those don't create no load in backend, and need BAN after updates.
 	# Do you even know when Google Ads does updates?
         if (req.http.Content-Type ~ "(text|application)/javascript") {
@@ -114,7 +107,7 @@ sub wp {
                 return(hash);
 	}
 	
-	# Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
+	## Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
         # The job will be done at vcl_backend_response
         # But is this really needed nowadays?
         if (req.http.Content-Type ~ "(audio|video)/") {
@@ -122,7 +115,7 @@ sub wp {
                 return(hash);
         }
 
-	# Let's cache images, even it is a stupid move
+	## Let's cache images, even it is a stupid move
 	if (req.http.Content-Type ~ "image/") {
 		unset req.http.cookie;
 		return(hash);
@@ -135,17 +128,25 @@ sub wp {
                 unset req.http.cookie;
                 return(hash);
         }
-	
+
+        ## Mastodon/ActivityPub
+        if (req.url ~ "^/wp-json/(activitypub|friends)/") {
+		unset req.http.cookie;
+                return(hash);
+        }
+        if (req.url ~ "^/api/(v1|v2)/") {
+		unset req.http.cookie;
+                return(hash);
+        }
+        if (req.url ~ "^/(nodeinfo|webfinger)") {
+		unset req.http.cookie;
+                return(hash);
+        }
+        
 	## Hit everything else
         if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
                 unset req.http.cookie;
         }
 
-	## Normalize the query arguments.
-        # Perhaps wp-admin etc should be excluded?
-        # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
-	# Every other VCL examples use this really early, but those are really aged tips and 
-	# I'm not so sure if those are actually ever tested in production.
-	set req.url = std.querysort(req.url);
-
+## The end is here
 }
