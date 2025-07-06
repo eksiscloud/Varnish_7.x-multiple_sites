@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🕵️ Yhteenveto kaikista 403-vastauksista:"
+echo "Summary of all 403-responses:"
 echo
 
 varnishlog -g request -q 'RespStatus == 403' \
@@ -32,7 +32,7 @@ varnishlog -g request -q 'RespStatus == 403' \
         print "    Language:  " (lang_val ? lang_val : "n/a")
         print "--------------------------"
 
-        # Nollataan tilat
+        # Nulling
         url = ""; match_val = ""; asn_val = ""; lang_val = "";
     }
 '
