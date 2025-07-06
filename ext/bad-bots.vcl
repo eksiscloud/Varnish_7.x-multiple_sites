@@ -380,6 +380,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "Tentacles"					# bad
 		|| req.http.User-Agent ~ "Test Certificate Info"		# malicious
 		|| req.http.User-Agent ~ "The Incutio XML-RPC PHP Library"	# malicious
+                || req.http.User-Agent ~ "Thinkbot"
 		|| req.http.User-Agent ~ "Thumbor"						# bad
 		|| req.http.User-Agent ~ "TPA/1.0.0"
 		|| req.http.User-Agent ~ "Trade Desk"
