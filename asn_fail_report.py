@@ -6,7 +6,7 @@ import pandas as pd
 import geoip2.database
 from collections import defaultdict
 
-# Oletuspolku ASN-tietokannalle
+# ASN-database
 DEFAULT_MMDB = "/usr/share/GeoIP/GeoLite2-ASN.mmdb"
 
 def parse_log_line(line):
