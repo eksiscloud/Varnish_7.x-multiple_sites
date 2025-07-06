@@ -73,12 +73,28 @@ sub be_ttled {
 	# RSS and other feeds like podcast can be cached
         # Podcast services are checking feeds way too often, and I'm quite lazy to publish,
         # so 24h delay is acceptable. And only bots read these.
-        if (bereq.http.Content-Type ~ "^(application|text)/xml") {
+        #if (bereq.http.Content-Type ~ "^(application|text)/xml") {
+	#	unset beresp.http.Cache-Control;
+        #        unset beresp.http.set-cookie;
+        #        set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
+        #        set beresp.ttl = 1d;
+        #}
+
+        # Podcast-feeds
+        if (bereq.url ~ "^/feed/podcast/[^/]+/?$") {
+		unset beresp.http.Cache-Control;
+		unset beresp.http.set-cookie;
+		set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
+		set beresp.ttl = 1w; # could be longer with xkey?
+	}
+
+        # WordPress article/RSS-feeds (legacy stuff, not in use)
+        if (bereq.url ~ "^/.+/.+/feed/?$") {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
-                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
-                set beresp.ttl = 1d;
-        }
+                set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
+                set beresp.ttl = 52w;
+	}
 
 	# Fonts don't change, is needed everywhere and are small
         if (bereq.http.Content-Type ~ "^font/") {
@@ -86,7 +102,6 @@ sub be_ttled {
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
                 set beresp.ttl = 52w;
-                unset beresp.http.set-cookie;
         }
 
         # Images don't change but takes space from users' devices
