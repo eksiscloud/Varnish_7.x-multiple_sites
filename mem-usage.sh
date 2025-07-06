@@ -1,21 +1,21 @@
 #!/bin/bash
 
-# Haetaan mallocin käytössä oleva ja vapaa muisti
+# Get what  malloc uses and free memory
 used_bytes=$(varnishstat -1 -f SMA.s0.g_bytes | awk '{print $2}')
 free_bytes=$(varnishstat -1 -f SMA.s0.g_space | awk '{print $2}')
 
-# Lasketaan kokonaismäärä
+# Counting total
 total_bytes=$(echo "$used_bytes + $free_bytes" | bc)
 
-# Lasketaan käyttöaste prosentteina
+# Counting usage
 usage_percent=$(echo "scale=1; 100 * $used_bytes / $total_bytes" | bc)
 
-# Muunnetaan GiB-yksiköihin
+# Change to GiB
 used_gb=$(echo "scale=2; $used_bytes / 1024 / 1024 / 1024" | bc)
 free_gb=$(echo "scale=2; $free_bytes / 1024 / 1024 / 1024" | bc)
 total_gb=$(echo "scale=2; $total_bytes / 1024 / 1024 / 1024" | bc)
 
-# Tulostus
+# Results
 echo
 echo "Varnish malloc memory usage:"
 echo "----------------------------"
@@ -24,11 +24,12 @@ printf "  Free memory:       %.2f GiB\n" "$free_gb"
 printf "  Total pool size:   %.2f GiB\n" "$total_gb"
 echo
 
-# Suositus (heuristinen)
+# What to change (heuristic)
+# This is... not so reliable way ;)
 if (( $(echo "$usage_percent < 20" | bc -l) )); then
-    echo "💡 Käyttöaste on alhainen. Voit todennäköisesti pienentää malloc-poolin kokoa."
+    echo "💡 Usage is low. You could propably reduce the size of malloc-pool."
 else
-    echo "✅ Käyttöaste vaikuttaa perustellulta nykyiseen kokoon nähden."
+    echo "✅ Usage seems to be good, when compared to the size."
 fi
 
 echo
