@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# I'm using this to generate ASN blocklists
+
 import os
 import re
 from pathlib import Path
