@@ -12,7 +12,7 @@ def generate_vcl(csv_path, output_path):
             ]
             for row in reader:
                 asn_id_full = row["ASN"].strip()
-                asn_id = asn_id_full.split()[0]  # Poimitaan numeerinen osa
+                asn_id = asn_id_full.split()[0]  # Picking up numerical part
                 description = row["Requests"].strip()
                 block = f"""    if (req.http.X-ASN-ID == "{asn_id}") {{
         set req.http.X-Match = "asn-as{asn_id}";
@@ -20,7 +20,7 @@ def generate_vcl(csv_path, output_path):
         return (synth(466, "Blocked ASN: {description} (AS{asn_id})"));
     }}"""
                 blocks.append(block)
-            blocks.append("}")  # sulkeva aaltosulje subille
+            blocks.append("}")  # closimg } for sub vcl
 
         with open(output_path, "w", encoding='utf-8') as vclfile:
             vclfile.write("\n\n".join(blocks))
