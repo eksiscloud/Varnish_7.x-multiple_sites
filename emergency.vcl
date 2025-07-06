@@ -28,15 +28,6 @@ backend default {
 	.between_bytes_timeout = 300s;
 }
 
-# git.eksis.one by Gitea
-#backend gitea {
-#	.path = "/run/gitea/gitea.sock";
-#	#.host = "localhost";
-#	#.port = "3000";
-#	.first_byte_timeout = 300s;
-#	.connect_timeout = 300s;
-#	.between_bytes_timeout = 300s;
-#}
 
 #################### vcl_init ##################
 
