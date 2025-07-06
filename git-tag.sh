@@ -1,28 +1,30 @@
 #!/bin/bash
 
-# Varmistetaan että ollaan main-haarassa
+# Yes. I am really, really, really bad at git.
+
+# Be sure you are in the main
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$current_branch" != "main" ]; then
-  echo "⚠️ Et ole main-haarassa (nyt: $current_branch)."
-  read -p "Haluatko jatkaa silti? (y/n) " continueanyway
+  echo "⚠️  You aren't in main branch (now: $current_branch)."
+  read -p "Do you still want to continue? (y/n) " continueanyway
   if [[ "$continueanyway" != "y" ]]; then
-    echo "⛔ Keskeytetään."
+    echo "⛔ Abort."
     exit 1
   fi
 fi
 
-# Näytetään nykyinen HEAD commit
-echo "🔍 Nykyinen HEAD:"
+# Show current HEAD commit
+echo "🔍 Current HEAD:"
 git log -1 --oneline
 
-# Kysytään tagin nimi ja kuvaus
+# Give name and description of a new tag
 echo ""
-read -p "Anna tagin nimi (esim. pre-asn-refactor-20250606): " tagname
-read -p "Anna lyhyt kuvaus: " tagdesc
+read -p "Give name of the tag (i.e. pre-asn-refactor-20250606): " tagname
+read -p "Give short description: " tagdesc
 
-# Luodaan annotoitu tagi
+# Create annotate tag
 git tag -a "$tagname" -m "$tagdesc"
-echo "✅ Tagi '$tagname' luotu."
+echo "✅ Tag '$tagname' created."
 
 # Kysytään lähetetäänkö GitHubiin
 read -p "Haluatko lähettää tagin GitHubiin? (y/n) " pushit
