@@ -5,10 +5,7 @@ sub be_ended {
 	## Let' build Vary
         # first cleaning it, because we don't care what backend wants.
         unset beresp.http.Vary;
-        
-        # I normalize Accept-Language, so it can be in vary
-	#set beresp.http.Vary = "Accept-Language";
-        
+                
 	# Accept-Encoding could be in Vary, because it changes content
 	# But it is handled internally by Varnish.
 	set beresp.http.Vary = "Accept-Encoding";
@@ -23,13 +20,6 @@ sub be_ended {
                 }
         }
 		
-	## Same thing here as in vcl_miss 
-	## No clue what to put as object 
-	#if (object needs ESI processing) {
-	#	set beresp.do_esi = true;
-	#	set beresp.do_gzip = true;
-	#}
-	
 	## Unset cookies except for Wordpress pages 
 	# Heads up: some sites may need to set cookie!
 	if (
@@ -48,15 +38,6 @@ sub be_ended {
 		return(deliver);
 	}
 
-	## I set X-Trace header, prepending it to X-Trace header received from backend. 
-	# Useful for troubleshooting
-	#if(beresp.http.x-trace && !beresp.was_304) {
-	#	set beresp.http.X-Trace = regsub(server.identity, "^([^.]+),?.*$", "\1")+"->"+regsub(beresp.backend.name, "^(.+)\((?:[0-9]{1,3}\.){3}([0-9]{1,3})\)","\1(\2)")+"->"+beresp.http.X-Trace;
-	#}
-	#else {
-	#	set beresp.http.X-Trace = regsub(server.identity, "^([^.]+),?.*$", "\1")+"->"+regsub(beresp.backend.name, "^(.+)\((?:[0-9]{1,3}\.){3}([0-9]{1,3})\)","\1(\2)");
-	#}
-
 	## Unset Accept-Language, if backend gave one. We still want to keep it outside cache.
 	unset beresp.http.Accept-Language;
 
@@ -65,4 +46,5 @@ sub be_ended {
 	# AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
 	unset beresp.http.Pragma;
 
+# End of this sub
 }
