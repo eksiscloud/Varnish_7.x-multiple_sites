@@ -67,86 +67,19 @@ sub wp {
 		set req.url = std.querysort(req.url);
 	}
 
-	## Text-files are static, so cache it is.
-	# Cache these is equally stupid than caching images, though.
-	# This includes sitemaps, so consider smart TTL and remember: the order matters
-        if (req.http.Content-Type ~ "text/") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-	## Fonts, another useless caching strategy
-        if (req.http.Content-Type ~ "font/") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-	## Feeds should be cached, but on other side: only bots use them
-        #if (req.http.Content-Type ~ "(application|text)/xml") {
-        #        unset req.http.cookie;
-        #        return(hash);
-	#}
-
-	## Podcast feeds
-        if (req.url ~ "^/feed/podcast/[^/]+/?$") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-        # WordPress article/RSS-feeds (legacy stuff, not in use)
-        if (req.url ~ "^/.+/.+/feed/?$") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-	## JavaScript are operating in user's device, so caching them is no issue. 
-	# But those don't create no load in backend, and need BAN after updates.
-	# Do you even know when Google Ads does updates?
-        if (req.http.Content-Type ~ "(text|application)/javascript") {
-                unset req.http.cookie;
-                return(hash);
-	}
 	
-	## Large static audio files will be cached and streamed. I don't host videos, so those are just extra.
-        # The job will be done at vcl_backend_response
-        # But is this really needed nowadays?
-        if (req.http.Content-Type ~ "(audio|video)/") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-	## Let's cache images, even it is a stupid move
-	if (req.http.Content-Type ~ "image/") {
-		unset req.http.cookie;
-		return(hash);
+	## Remove query strings from some static files
+	if (req.url ~ "\.(?:png|jpg|jpeg|webp|gif|css|js|woff2?)\?.*") {
+		set req.url = regsub(req.url, "\?.*", "");
 	}
 
-       ## Cache all static files by Removing all Cookies for static files
-        # These haven't Content-type, I don't know it or there is another reason to keep this that way.
-        # Remember, do you really need to cache static files that don't cause load? Only if you have memory left.
-        if (req.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|xls|xlsx|xz|zip)(\?.*)?$") {
-                unset req.http.cookie;
-                return(hash);
-        }
-
-        ## Mastodon/ActivityPub
-        if (req.url ~ "^/wp-json/(activitypub|friends)/") {
-		unset req.http.cookie;
-                return(hash);
-        }
-        if (req.url ~ "^/api/(v1|v2)/") {
-		unset req.http.cookie;
-                return(hash);
-        }
-        if (req.url ~ "^/(nodeinfo|webfinger)") {
-		unset req.http.cookie;
-                return(hash);
-        }
-        
 	## Hit everything else
+	# First, bye bye cookies
         if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
                 unset req.http.cookie;
         }
+	# Second, welcome hash
+	return(hash); # Varnish will do this anyway and actually this will break in-build VCL, but the next stop is hash, so...
 
 ## The end is here
 }
