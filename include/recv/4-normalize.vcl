@@ -73,12 +73,15 @@ sub normalize-4 {
                 return(synth(405, "Non-valid HTTP method!"));
         }
 
-	## Remove the Google Analytics added parameters, useless for backend
-	if (req.url ~ "(\?|&)(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|cx|ie|cof|siteurl)=") {
-		set req.url = regsuball(req.url, "&(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|cx|ie|cof|siteurl)=([A-z0-9_\-\.%25]+)", "");
-		set req.url = regsuball(req.url, "\?(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|cx|ie|cof|siteurl)=([A-z0-9_\-\.%25]+)", "?");
-		set req.url = regsub(req.url, "\?&", "?");
-		set req.url = regsub(req.url, "\?$", "");
+	## Remove known following parameters, useless for backend
+	if (req.url ~ "(\?|&)(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=") {
+		# Remove all &param=...
+		set req.url = regsuball(req.url, "&(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=[^&]*", "");
+		# Remove possible first ?param=... beginning
+		set req.url = regsuball(req.url, "\?(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=[^&]*", "?");
+		# Clean the rest 
+		set req.url = regsub(req.url, "\?&", "?");   # change i.e. ?&param=... -> ?param=...
+		set req.url = regsub(req.url, "\?$", "");    # remove the lonely ? from the end
 	}
 
         ## Save Origin (for CORS) in a custom header and remove Origin from the request 
