@@ -70,16 +70,6 @@ sub be_ttled {
                 set beresp.ttl = 30d;
 	}
 
-	# RSS and other feeds like podcast can be cached
-        # Podcast services are checking feeds way too often, and I'm quite lazy to publish,
-        # so 24h delay is acceptable. And only bots read these.
-        #if (bereq.http.Content-Type ~ "^(application|text)/xml") {
-	#	unset beresp.http.Cache-Control;
-        #        unset beresp.http.set-cookie;
-        #        set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
-        #        set beresp.ttl = 1d;
-        #}
-
         # Podcast-feeds
         if (bereq.url ~ "^/feed/podcast/[^/]+/?$") {
 		unset beresp.http.Cache-Control;
