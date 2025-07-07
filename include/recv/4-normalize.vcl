@@ -74,15 +74,15 @@ sub normalize-4 {
         }
 
 	## Remove known following parameters, useless for backend
-	if (req.url ~ "(\?|&)(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=") {
-		# Remove all &param=...
-		set req.url = regsuball(req.url, "&(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=[^&]*", "");
-		# Remove possible first ?param=... beginning
-		set req.url = regsuball(req.url, "\?(utm_source|utm_medium|utm_campaign|utm_term|utm_content|gclid|fbclid|msclkid|dclid|yclid|fb_source|ref|igshid|mc_cid|mc_eid|cx|ie|cof|siteurl)=[^&]*", "?");
-		# Clean the rest 
-		set req.url = regsub(req.url, "\?&", "?");   # change i.e. ?&param=... -> ?param=...
-		set req.url = regsub(req.url, "\?$", "");    # remove the lonely ? from the end
-	}
+	# Analytics: utm_*, gclid, fbclid, msclkid, ga_source
+	# Marketing: mc_cid, mc_eid, trk, elqTrackId
+	# Social: fb_source, shared, msg, ref, igshid
+	# WordPress related: tmstv, siteurl, cx, cof, ie
+	# Hubspot: _hsenc, _hsmi
+	set req.url = regsuball(req.url, "&(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|msclkid|dclid|yclid|mc_cid|mc_eid|cx|ie|cof|siteurl|ref|igshid|fb_source|trk|elqTrackId|tmstv|shared|msg|_hsenc|_hsmi|ga_source)=[^&]*", "");
+	set req.url = regsuball(req.url, "\?(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|msclkid|dclid|yclid|mc_cid|mc_eid|cx|ie|cof|siteurl|ref|igshid|fb_source|trk|elqTrackId|tmstv|shared|msg|_hsenc|_hsmi|ga_source)=[^&]*", "?");
+	set req.url = regsub(req.url, "\?&", "?");
+	set req.url = regsub(req.url, "\?$", "");
 
         ## Save Origin (for CORS) in a custom header and remove Origin from the request 
         ## so that backend doesn’t add CORS headers.
