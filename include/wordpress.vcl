@@ -31,9 +31,9 @@ sub wp {
 	}
 
         ## Don't cache wordpress related pages
-        if (req.url ~ "(signup|activate|mail|logout)") {
-                return(pass);
-        }
+	if (req.url ~ "^/(signup|activate|mail|logout)(/|$)") {
+		return(pass);
+	}
 
 	## Adsense incomings are lower when Varnish is on, trying to solve out this
 	# is it because of caching or CSP-rules?
@@ -78,8 +78,6 @@ sub wp {
         if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
                 unset req.http.cookie;
         }
-	# Second, welcome hash
-	return(hash); # Varnish will do this anyway and actually this will break in-build VCL, but the next stop is hash, so...
-
+	
 ## The end is here
 }
