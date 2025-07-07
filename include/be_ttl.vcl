@@ -63,7 +63,7 @@ sub be_ttled {
 
 	# This includes .css and .js too.
 	# I'll later finetune this by type and actual files
-	if (bereq.http.Content-Type ~ "^text/") {
+	if (beresp.http.Content-Type ~ "^text/") {
 		unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
 		set beresp.http.Cache-Control = "public, max-age=1209600"; # 2w
@@ -117,7 +117,7 @@ sub be_ttled {
         }
 
 	# Fonts don't change, is needed everywhere and are small
-        if (bereq.http.Content-Type ~ "^font/") {
+        if (beresp.http.Content-Type ~ "^font/") {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
@@ -125,7 +125,7 @@ sub be_ttled {
         }
 
         # Images don't change but takes space from users' devices
-        if (bereq.http.Content-Type ~ "^image/") {
+        if (beresp.http.Content-Type ~ "^image/") {
                 unset beresp.http.set-cookie;
 		unset beresp.http.Cache-Control;
 		set beresp.http.Cache-Control = "public, max-age=172800s"; # 2d
@@ -135,15 +135,24 @@ sub be_ttled {
 	# Large static files are delivered directly to the end-user without waiting for Varnish to fully read
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
-	if (beresp.http.Content-Type ~ "^(audio|video)/") {
+	# I shouldn't have any local videos, though
+	if (beresp.http.Content-Type ~ "^(video/)") {
 		unset beresp.http.set-cookie;
 		unset beresp.http.Cache-Control;
 		set beresp.uncacheable = true;
 		set beresp.ttl = 0s;
 		set beresp.do_stream = true;
 		# for clarity and logging
-		set beresp.http.X-Cache-Control = "pass-through: streamed media";
+		set beresp.http.X-Cache-Control = "pass: streamed video";
 	}
+	# this is for local audio only, if any
+        if (beresp.http.Content-Type ~ "^(audio)/") {
+                unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+		set beresp.http.Cache-Control = "public, max-age=7200s"; # 2h
+                set beresp.ttl = 24h;
+                set beresp.do_stream = true;
+        }
 
 	# These can be really big and not so often requested. And if there is a rush, those can be fetched
         if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
