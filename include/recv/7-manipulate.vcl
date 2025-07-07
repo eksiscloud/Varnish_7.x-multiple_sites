@@ -10,8 +10,7 @@ if (req.http.host ~ "www.katiska.eu") {
 		
 		# Searches
 	if (req.url ~ "(\?s=|/search/)") {
-		if (req.url ~ "\?s=koira$") { set req.url = regsub(req.url, "\?s=koira$", "/tieto/katiskan-kaytto-sisalto/asian-loytaminen/"); return(restart); } # why I need restart here?
-		elseif (req.url ~ "/search/50%2F50") { set req.url = regsub(req.url, "/search/50%2F50", "/search/50-F50"); } 
+		if (req.url ~ "/search/50%2F50") { set req.url = regsub(req.url, "/search/50%2F50", "/search/50-F50"); } 
 		elseif (req.url ~ "\?s=a2-vitamiini") { set req.url = regsub(req.url, "\?s=a2-vitamiini", "\?s=a-vitamiini"); }
 		elseif (req.url ~ "\?s=d3$") { set req.url = regsub(req.url, "\?s=d3$", "\?s=d-vitamiini"); }
 		elseif (req.url ~ "\?s=be$") { set req.url = regsub(req.url, "\?s=be$", "\?s=be-vitamiini"); }
