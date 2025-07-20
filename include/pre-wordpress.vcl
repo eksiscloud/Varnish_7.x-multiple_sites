@@ -3,7 +3,7 @@ sub before_wp {
         ## Fix Wordpress visual editor and login issues, must be the first url pass requests and
         #  before cookie monster to work.
         # Backend of Wordpress
-        if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/lataus|/my-account)") {
+        if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/my-account)") {
                 return(pass);
         }
 

@@ -28,7 +28,7 @@ sub be_ttled {
 	## Do not let a browser cache WordPress admin. Safari is very aggressive to cache things
 	if (bereq.url ~ 
 		"^/wp-(login|admin|my-account|comments-post.php|cron)" || 
-		bereq.url ~ "/(login|lataus)" || 
+		bereq.url ~ "/login" || 
 		bereq.url ~ "preview=true") {
 			unset beresp.http.Cache-Control;
 			set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
