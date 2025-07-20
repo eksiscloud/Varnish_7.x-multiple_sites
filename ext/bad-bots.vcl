@@ -144,6 +144,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "ev-crawler"		
 		# F
 #		|| req.http.User-Agent ~ "Facebot Twitterbot"			# When legit it is preview of Apple devices
+		|| req.http.User-Agent ~ "fediversecounter"			# too keen mastodon.social
 		|| req.http.User-Agent ~ "Faraday"
 		|| req.http.User-Agent ~ "Foregenix"
 		|| req.http.User-Agent ~ "fr-crawler"
