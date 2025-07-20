@@ -143,7 +143,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "evc-batch"
 		|| req.http.User-Agent ~ "ev-crawler"		
 		# F
-#		|| req.http.User-Agent ~ "Facebot Twitterbot"			# When legit it is preview of Apple devices
+		|| req.http.User-Agent ~ "facebookexternalhit/1.1 Facebot Twitterbot/1.0"	# When legit it is preview of Apple devices
 		|| req.http.User-Agent ~ "fediversecounter"			# too keen mastodon.social
 		|| req.http.User-Agent ~ "Faraday"
 		|| req.http.User-Agent ~ "Foregenix"
@@ -184,6 +184,7 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "IAS crawler"					# bad
 		|| req.http.User-Agent ~ "ias-"							# bad
 		|| req.http.User-Agent ~ "Iframely"
+		|| req.http.User-Agent ~ "ImagesiftBot"
 		|| req.http.User-Agent ~ "import.io"
 		|| req.http.User-Agent ~ "Incutio"
 		|| req.http.User-Agent ~ "INGRID/"
