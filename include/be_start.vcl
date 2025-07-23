@@ -10,7 +10,7 @@ sub be_started {
 	std.log("backend: " + beresp.backend.name);
 
 	## Log when TTL is soon expiring. I'm trying to understand insidences when memory use of Varnish drops a lot.
-	if (beresp.ttl < 1h) {
+	if (!beresp.uncacheable && beresp.ttl < 1h) {
 		# varnishlog
 		std.log("SHORT_TTL: " + bereq.url + " TTL=" + beresp.ttl);
 		# syslog/rsyslog
