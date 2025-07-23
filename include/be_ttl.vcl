@@ -58,17 +58,76 @@ sub be_ttled {
 		set beresp.ttl = 52w;
 	}
 
-	## Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
-        # Most of media files should be served from CDN anyway, so let's do some cosmetic caching.
+	### Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
 
-	# This includes .css and .js too.
-	# I'll later finetune this by type and actual files
-	if (beresp.http.Content-Type ~ "^text/") {
-		unset beresp.http.Cache-Control;
+	## First I deal with content types, kind of semi-defaults
+
+        # Fonts don't change, is needed everywhere and are small
+        if (beresp.http.Content-Type ~ "^font/") {
+                unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
-		set beresp.http.Cache-Control = "public, max-age=1209600"; # 2w
-                set beresp.ttl = 30d;
+                set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
+                set beresp.ttl = 52w;
+        }
+
+        # Images don't change but takes space from users' devices
+        if (beresp.http.Content-Type ~ "^image/") {
+                unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=172800s"; # 2d
+                set beresp.ttl = 52w;
+        }
+
+       # Large static files are delivered directly to the end-user without waiting for Varnish to fully read
+        # Most of these should be in CDN, but I have some MP3s behind backend
+        # Is this really needed anymore? AFAIK Varnish should do this automatic.
+        # I shouldn't have any local videos, though
+        if (beresp.http.Content-Type ~ "^(video/)") {
+                unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.uncacheable = true;
+                set beresp.ttl = 0s;
+                set beresp.do_stream = true;
+                # for clarity and logging
+                set beresp.http.X-Cache-Control = "pass: streamed video";
+        }
+        # this is for local audio only, if any
+        if (beresp.http.Content-Type ~ "^(audio)/") {
+                unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=7200s"; # 2h
+                set beresp.ttl = 24h;
+                set beresp.do_stream = true;
 	}
+
+	# This include CSS and JS too, but those are dealed later, though
+        if (beresp.http.Content-Type ~ "^text/" || beresp.http.Content-Type ~ "application/(json|xml)") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=1209600"; # 2w
+                set beresp.ttl = 30d;
+        }
+
+	## Second: static files will overdrive content type, if there is a match
+
+	# CSS/JS may change when updating. But WordPress will purge cache when updated, so mainly I'm taking care users here.
+	if (bereq.url ~ "\.(css|js)") {
+		unset beresp.http.set-cookie;
+		unset beresp.http.Cache-Control;
+		set beresp.http.Cache-Control = "public, max-age=1209600"; # 2w client
+		set beresp.ttl = 52w;
+	}
+
+        # These can be really big and not so often requested. And if there is a rush, those can be fetched
+        if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
+                unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
+                set beresp.ttl = 4w; # users may actually need longer than is requested from cache
+                set beresp.do_stream = true;
+        }
+
+	## Lastly there is paths, urls and direct files. Again: this section overdrives earlie ruoe, if there is a match
 
         # Podcast-feeds
         if (bereq.url ~ "^/feed/podcast/[^/]+/?$") {
@@ -106,59 +165,12 @@ sub be_ttled {
                 set beresp.ttl = 4w;
         }
 
-	# Fonts don't change, is needed everywhere and are small
-        if (beresp.http.Content-Type ~ "^font/") {
-                unset beresp.http.Cache-Control;
-                unset beresp.http.set-cookie;
-                set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
-                set beresp.ttl = 52w;
-        }
-
-        # Images don't change but takes space from users' devices
-        if (beresp.http.Content-Type ~ "^image/") {
-                unset beresp.http.set-cookie;
-		unset beresp.http.Cache-Control;
-		set beresp.http.Cache-Control = "public, max-age=172800s"; # 2d
-		set beresp.ttl = 52w;
-        }
-
-	# Large static files are delivered directly to the end-user without waiting for Varnish to fully read
-        # Most of these should be in CDN, but I have some MP3s behind backend
-        # Is this really needed anymore? AFAIK Varnish should do this automatic.
-	# I shouldn't have any local videos, though
-	if (beresp.http.Content-Type ~ "^(video/)") {
-		unset beresp.http.set-cookie;
-		unset beresp.http.Cache-Control;
-		set beresp.uncacheable = true;
-		set beresp.ttl = 0s;
-		set beresp.do_stream = true;
-		# for clarity and logging
-		set beresp.http.X-Cache-Control = "pass: streamed video";
-	}
-	# this is for local audio only, if any
-        if (beresp.http.Content-Type ~ "^(audio)/") {
-                unset beresp.http.set-cookie;
-                unset beresp.http.Cache-Control;
-		set beresp.http.Cache-Control = "public, max-age=7200s"; # 2h
-                set beresp.ttl = 24h;
-                set beresp.do_stream = true;
-        }
-
-	# These can be really big and not so often requested. And if there is a rush, those can be fetched
-        if (bereq.url ~ "^[^?]*\.(7z|bz2|doc|docx|eot|gz|otf|pdf|ppt|pptx|tar|tbz|tgz|txz|xls|xlsx)") {
-		unset beresp.http.Cache-Control;
-                unset beresp.http.set-cookie;
-                set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
-                set beresp.ttl = 4w; # users may actually need longer than is requested from cache
-                set beresp.do_stream = true;
-	}
-
 	# WordPress archive page of podcasts
-	if (bereq.url ~ "/podcastit/") {
+	if (bereq.url ~ "^/podcastit(/)?$") {
 		unset beresp.http.set-cookie;
 		unset beresp.http.cache-control;
 		set beresp.http.cache-control = "public, max-age=43200"; # 12h for client
-		set beresp.ttl = 2d;
+		set beresp.ttl = 52w; # xkey will purge this
 	}
 
         # Robots.txt is really static, but let's be on safe side
