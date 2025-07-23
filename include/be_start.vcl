@@ -9,6 +9,22 @@ sub be_started {
 	# varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
 	std.log("backend: " + beresp.backend.name);
 
+	## Log when TTL is soon expiring. I'm trying to understand insidences when memory use of Varnish drops a lot.
+	if (beresp.ttl < 1h) {
+		# varnishlog
+		std.log("SHORT_TTL: " + bereq.url + " TTL=" + beresp.ttl);
+		# syslog/rsyslog
+		std.syslog(134, "SHORT_TTL: " + bereq.url + " TTL=" + beresp.ttl);
+	}
+
+	## Log all MP3 cases
+	if (bereq.url ~ "\.mp3(\?.*)?$") {
+		# varnishlog
+		std.log("BIG_OBJECT: " + bereq.url + " TTL=" + beresp.ttl);
+		# syslog/rsyslog
+		std.syslog(150, "BIG_OBJECT: " + bereq.url + " TTL=" + beresp.ttl);
+	}
+
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
