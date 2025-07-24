@@ -9,22 +9,6 @@ sub be_started {
 	# varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
 	std.log("backend: " + beresp.backend.name);
 
-	## Log when TTL is soon expiring. I'm trying to understand insidences when memory use of Varnish drops a lot.
-	if (!beresp.uncacheable && beresp.ttl < 1h) {
-		# varnishlog
-		std.log("SHORT_TTL: " + bereq.url + " TTL=" + beresp.ttl);
-		# syslog/rsyslog
-		std.syslog(134, "SHORT_TTL: " + bereq.url + " TTL=" + beresp.ttl);
-	}
-
-	## Log all MP3 cases
-	if (bereq.url ~ "\.mp3(\?.*)?$") {
-		# varnishlog
-		std.log("BIG_OBJECT: " + bereq.url + " TTL=" + beresp.ttl);
-		# syslog/rsyslog
-		std.syslog(150, "BIG_OBJECT: " + bereq.url + " TTL=" + beresp.ttl);
-	}
-
 	## Let's create a couple helpful tag'ish
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
@@ -37,26 +21,28 @@ sub be_started {
 	        set beresp.grace = 12h;
 	}
 
-	## Wordpress is down, let's start snapshot route
+	## Snapshot routines 
+
+	# Wordpress is down, let's start snapshot route
 	if (beresp.status == 500) {
 		std.syslog(180, "Backend: error  HTTP 500 – move to vcl_backend_error");
 		return (fail);
 	}
 
-        ## One really stranger thing where backend can tell 503, let's start snapshot route
+        # One really stranger thing where backend can tell 503, let's start snapshot route
         if (beresp.status == 503) {
                 std.syslog(180, "Backend: error  HTTP 503 – move to vcl_backend_error");
                 return (fail);
         }
 
-        ## Backend has gateway issue, let's start snapshot route
+        # Backend has gateway issue, let's start snapshot route
         if (beresp.status == 504) {
                 std.syslog(180, "Backend: error  HTTP 504 – move to vcl_backend_error");
                 return (fail);
         }
 
-	## if backend is down we move to snapshot backend that serves static content, when not in cache
-	## Few things must  be changed then
+	# if backend is down we move to snapshot backend that serves static content, when not in cache
+	# Few things must  be changed then
 	# Varnish uses 200 OK, because it got content, but we don't want to tell to bits that temporary content is 200
 	if (bereq.backend == snapshot && beresp.status == 200) {
 		std.log(">> Snapshot backend responded 200 — rewriting to 302");
@@ -64,10 +50,10 @@ sub be_started {
 		set beresp.reason = "Service Unavailable (snapshot)";
 	}
 
-	## If there was an backend error (500/502/503/504) where backend can give a response
+	# If there was an backend error (500/502/503/504) where backend can give a response
 	if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
 
-        	# If this was a background fetch (i.e. after grace delivering), abandom
+        	# If this was a background fetch (i.e. after grace delivering), abandon
 		if (bereq.is_bgfetch) {
 			std.syslog(180, "Backend failure, abandoning bgfetch for " + bereq.url);
 			return(abandon);

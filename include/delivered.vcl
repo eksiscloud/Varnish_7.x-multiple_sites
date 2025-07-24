@@ -12,10 +12,57 @@ sub deliverit {
 		return(synth(666, "Requests not allowed for " + req.url));
 	}
 
+        ## Just some unneeded headers showing unneeded data
+
+        # HIT & MISS
+        if (obj.uncacheable) {
+                set req.http.x-cache = req.http.x-cache + " uncacheable" ;
+        } else {
+                set req.http.x-cache = req.http.x-cache + " cached" ;
+        }
+        # uncomment the following line to show the information in the response
+        set resp.http.x-cache = req.http.x-cache;
+
+        if (obj.hits > 0) {
+                # I don't fancy boring hit/miss announcements
+                set resp.http.You-had-only-one-job = "Success";
+        } else {
+                set resp.http.You-had-only-one-job = "Phew";
+        }
+
+        # Show hit counts (per objecthead)
+        # Same here, something like X-total-hits is just boring
+        if (obj.hits > 0) {
+                set resp.http.Footprint-of-CO2 = (obj.hits) + " metric-tons";
+        } else {
+                set resp.http.Footprint-of-CO2 = "Greenwash in progress";
+        }
+
 	## Debug for 403
 	#if (resp.status == 403) {
 	#	call debug_headers;
 	#}
+
+	## Logs short and close to expire TTLs
+	if (obj.ttl < 3600s && !obj.uncacheable) {
+		std.log("SHORT_TTL_DELIVER: " + req.url +
+			" HIT/MISS=" + resp.http.X-Cache +
+			" TTL=" + obj.ttl);
+	}
+
+	## Logs ttl of the most used images
+	if (req.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$") {
+		std.log("IMAGE-DELIVER: " + req.url +
+			" HIT/MISS=" + resp.http.X-Cache +
+			" TTL=" + obj.ttl);
+	}
+
+	## Logs ttl of MP3s
+	if (req.url ~ "\.mp3(\?.*)?$") {
+		std.log("MP3-DELIVER: " + req.url +
+			" HIT/MISS=" + resp.http.X-Cache +
+			" TTL=" + obj.ttl);
+	}
 
 	## And now I remove my helpful tag'ish
 	# Now something like this works:
