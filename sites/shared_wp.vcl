@@ -107,7 +107,7 @@ include "/etc/varnish/include/x-key.vcl";
 include "/etc/varnish/include/delivered.vcl";
 
 # vcl_deliver, part II, counters
-include "/etc/varnish/include/counters.vcl";
+#include "/etc/varnish/include/counters.vcl";
 
 # vcl_deliver, part III, headers
 include "/etc/varnish/include/showed.vcl";
@@ -422,7 +422,7 @@ sub vcl_deliver {
 	
 	## Some counters and that kind of stuff
 	# include/counters.vcl
-	call countit;
+#	call countit;
 	
 	## Manipulating headers etc.
 	# include/showed.vcl
