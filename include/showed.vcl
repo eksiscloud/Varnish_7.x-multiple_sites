@@ -5,10 +5,13 @@ sub showit {
 	## Last-Modified timestamp may be interesting for users, but unnecessary
 	# but I want to mask it a little bit, and show it, because I'm curious, even curiosity kills the cat
 	# Last-Modified comes only from backend. Cached content hasn't it.
-	if (resp.http.Last-Modified != "") {
-		set resp.http.those-good-old-days = resp.http.Last-Modified;
+	if (!resp.http.Last-Modified || resp.http.Last-Modified == "") {
+		unset resp.http.Last-Modified;		
 	}
-	unset resp.http.Last-Modified;
+	else {
+		set resp.http.those-good-old-days = resp.http.Last-Modified;
+		unset resp.http.Last-Modified;
+	}
 	
 	## Just to be sure who is seeing what
 	if (req.http.x-bot) {
