@@ -205,29 +205,19 @@ sub be_ttled {
 
         ## I'm trying to understand insidences when memory use of Varnish drops a lot.
 
-	# Show TTL for logging
-#	set beresp.http.X-TTL = beresp.ttl;
-
-        # TTL is under 1 hour and not uncacheable
-        if (!beresp.uncacheable && beresp.ttl < 1h) {
-                # logs if miss; varnisglog
-                std.log("SHORT_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
-                # syslog/rsyslog
-                std.syslog(134, "SHORT_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
-        }
-
         # Log all MP3 cases
         if (bereq.url ~ "\.mp3(\?.*)?$") {
                 # logs if miss; varnisglog
-                std.log("BIG_OBJECT_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
+                std.log("MP3_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
                 # syslog/rsyslog
-                std.syslog(150, "BIG_OBJECT: " + bereq.url + " TTL=" + beresp.ttl);
+                std.syslog(150, "MP3_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
         }
 
         # log ttl of the most used images. Here we can log only misses, because hits never arrived here
         if (bereq.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$") {
                 # from the backend, aka. miss
-                std.log("IMAGE-BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
+                std.log("IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
+		std.syslog(150, "IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl); 
         }
 
 ## End of this one

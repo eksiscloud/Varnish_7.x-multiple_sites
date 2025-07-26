@@ -52,14 +52,14 @@ sub deliverit {
 
 	## Logs ttl of the most used images
 	if (req.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$") {
-		std.log("IMAGE-DELIVER: " + req.url +
+		std.log("IMAGE_TTL_DELIVER: " + req.url +
 			" HIT/MISS=" + resp.http.X-Cache +
 			" TTL=" + obj.ttl);
 	}
 
 	## Logs ttl of MP3s
 	if (req.url ~ "\.mp3(\?.*)?$") {
-		std.log("MP3-DELIVER: " + req.url +
+		std.log("MP3_TTL_DELIVER: " + req.url +
 			" HIT/MISS=" + resp.http.X-Cache +
 			" TTL=" + obj.ttl);
 	}
