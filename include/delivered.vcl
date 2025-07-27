@@ -55,6 +55,9 @@ sub deliverit {
 		std.log("IMAGE_TTL_DELIVER: " + req.url +
 			" HIT/MISS=" + resp.http.X-Cache +
 			" TTL=" + obj.ttl);
+		std.syslog(150, "IMAGE_TTL_DELIVER: " + req.url + 
+				" HIT/MISS=" + resp.http.X-Cache +
+				" TTL=" + obj.ttl);
 	}
 
 	## Logs ttl of MP3s
@@ -62,6 +65,9 @@ sub deliverit {
 		std.log("MP3_TTL_DELIVER: " + req.url +
 			" HIT/MISS=" + resp.http.X-Cache +
 			" TTL=" + obj.ttl);
+		std.syslog(150, "MP3_TTL_DELIVER: " + req.url +
+                                " HIT/MISS=" + resp.http.X-Cache +
+                                " TTL=" + obj.ttl);
 	}
 
 	## And now I remove my helpful tag'ish

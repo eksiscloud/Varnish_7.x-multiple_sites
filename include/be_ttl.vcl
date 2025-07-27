@@ -203,18 +203,9 @@ sub be_ttled {
                 set beresp.ttl = 4w;
         }
 
-        ## I'm trying to understand insidences when memory use of Varnish drops a lot.
-
-        # Log all MP3 cases
-        if (bereq.url ~ "\.mp3(\?.*)?$") {
-                # logs if miss; varnisglog
-                std.log("MP3_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
-                # syslog/rsyslog
-                std.syslog(150, "MP3_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
-        }
-
+        ## I'm trying to understand why some images get low TTL
         # log ttl of the most used images. Here we can log only misses, because hits never arrived here
-        if (bereq.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$") {
+        if (bereq.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$" && beresp.ttl < 52w) {
                 # from the backend, aka. miss
                 std.log("IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
 		std.syslog(150, "IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl); 
