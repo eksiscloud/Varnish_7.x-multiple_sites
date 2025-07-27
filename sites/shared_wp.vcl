@@ -61,11 +61,14 @@ include "/etc/varnish/include/recv/7-manipulate.vcl";
 # Is there ban or purge, and who can do it
 include "/etc/varnish/include/recv/8-ban_purge.vcl";
 
+# CORS can be handful, so let's give own VCL. This is for incoming requests
+include "/etc/varnish/include/recv/9-cors.vcl";
+
 # Something must do before cookies are cleaned
-include "/etc/varnish/include/pre-wordpress.vcl";
+include "/etc/varnish/include/recv/10-pre-wordpress.vcl";
 
 # Cleaning cookies for WordPress
-include "/etc/varnish/include/cookie_monster.vcl";
+include "/etc/varnish/include/recv/11-cookie_monster.vcl";
 
 # Setting up pipe/pass/hash etc. what WordPress wants
 include "/etc/varnish/include/wordpress.vcl";
@@ -240,22 +243,18 @@ sub vcl_recv {
 	}
 	
 	## Ban & Purge
-	# include/ban_purge.vcl
 	if (req.method == "BAN" || req.method == "PURGE") {
 		call ban_purge-8;
 	}
 	
 	## Setup CORS
-	# ext/cors.vcl
-	call cors;
+	call cors-9;
 
         ## These must, should or could do before cookie monster
-        # includes/pre-wordpress.vcl
-        call before_wp;
+        call pre-wordpress-10;
 
         ## The infamous Cookie Monster
-        # include/cookie_monster.vcl
-        call eat_it;
+        call cookie_monster-11;
 
 	## Everything what a WordPress needs
 	# include/wordpress.vcl
@@ -461,7 +460,8 @@ sub vcl_synth {
 	# set resp.http.x-cache = req.http.x-cache;
 	
 	## Must handle cors here too
-	call cors;
+	# was: call cors; so exacly what cors should I call here? Fix this.
+	call cors_deliver;
 	
 	## Synth errors, real on customs
 	# include/erroed.vcl
