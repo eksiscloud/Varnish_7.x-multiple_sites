@@ -71,10 +71,10 @@ include "/etc/varnish/include/recv/10-pre-wordpress.vcl";
 include "/etc/varnish/include/recv/11-cookie_monster.vcl";
 
 # Setting up pipe/pass/hash etc. what WordPress wants
-include "/etc/varnish/include/wordpress.vcl";
+include "/etc/varnish/include/recv/12-wordpress.vcl";
 
 # There is still something to do before leaving vcl_recv
-include "/etc/varnish/include/last_ones.vcl";
+include "/etc/varnish/include/recv/13-wordpress_end.vcl";
 
 # vcl_pipe
 include "/etc/varnish/include/piped.vcl";
@@ -128,6 +128,9 @@ include "/etc/varnish/ext/cors.vcl";
 
 # Some security related headers
 include "/etc/varnish/ext/security.vcl";
+
+## Debugs
+#include /etc/varnish/include/debug/wordpress_debug.vcl
 
 ## Probes are watching if backends are healthy
 ## You can check if a backend is  healthy or sick:
@@ -257,18 +260,13 @@ sub vcl_recv {
         call cookie_monster-11;
 
 	## Everything what a WordPress needs
-	# include/wordpress.vcl
-	call wp;
+	call wordpress-12;
+
+	# If needed
 	#call wordpress_debug;
 
 	## Last things to set up
-	# include/last_ones.vcl
-	call these_too;
-
-	## 50x raportoinnin debug
-	#if (req.url ~ "^/test-synth") {
-        #    return (synth(503, "Pakotettu virhe"));
-	#}
+	call wordpress_end-13;
 
 	## Cache all others requests if they reach this point.
 	# Needed because of all return jumps.
