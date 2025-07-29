@@ -96,7 +96,7 @@ sub be_ttled {
                 unset beresp.http.set-cookie;
                 unset beresp.http.Cache-Control;
                 set beresp.http.Cache-Control = "public, max-age=7200s"; # 2h
-                set beresp.ttl = 24h;
+                set beresp.ttl = 30d;
                 set beresp.do_stream = true;
 	}
 
@@ -123,7 +123,7 @@ sub be_ttled {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=604800"; # 1 week
-                set beresp.ttl = 4w; # users may actually need longer than is requested from cache
+                set beresp.ttl = 30d; # users may actually need longer than is requested from cache
                 set beresp.do_stream = true;
         }
 
@@ -162,7 +162,7 @@ sub be_ttled {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=86400"; # 24h, what is the point for this...
-                set beresp.ttl = 4w;
+                set beresp.ttl = 30d;
         }
 
 	# WordPress archive page of podcasts
@@ -200,7 +200,7 @@ sub be_ttled {
                 unset beresp.http.Cache-Control;
                 unset beresp.http.set-cookie;
                 set beresp.http.Cache-Control = "public, max-age=86400"; # 24h
-                set beresp.ttl = 4w;
+                set beresp.ttl = 52w;
         }
 
         ## I'm trying to understand why some images get low TTL
