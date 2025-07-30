@@ -106,6 +106,9 @@ include "/etc/varnish/include/be_end.vcl";
 # vcl_backend_response, pat IV, xkey
 include "/etc/varnish/include/x-key.vcl";
 
+# vcl_backend_error
+include "/etc/varnish/include/backend_error/be_fail.vcl";
+
 # vcl_deliver, part I
 include "/etc/varnish/include/delivered.vcl";
 
@@ -375,27 +378,11 @@ sub vcl_backend_response {
 #######################vcl_backend_error###############
 ## Tells what to when backend doesn`t give suitable answers and backend_response can't do anything
 ## The default action is return(deliver)
-## Normally this block isn't visible. I'm using it for grace/errro 503 situation
+## Normally this block isn't visible. I'm using it for snapshot_service when backend is down
 sub vcl_backend_error {
 
-   # Jos ei vielä ole retry tehty, tee se
-    if (bereq.retries == 0) {
-	std.syslog(180, "ALERT: Apache is not responding on first attempt: " + bereq.url);
-        std.log(">> Backend error: first retry");
-        return (retry);
-    }
-
-    # Jos ensimmäinen retry tehty, kokeillaan snapshot-backendia
-    if (bereq.retries == 1 &&
-        (beresp.status == 500 || beresp.status == 503 || beresp.status == 504)) {
-        std.log(">> Backend error: switching to snapshot backend");
-        set bereq.backend = snapshot;
-        return (retry);
-    }
-
-    # Mikään ei toiminut, anna virhe asiakkaalle
-    std.log(">> Backend error: all retries failed");
-    return (fail);
+	## Backend is down, start snapshot
+	call be_fail;
 
 # We are ready here
 }
@@ -464,13 +451,6 @@ sub vcl_synth {
 	## Synth errors, real on customs
 	# include/erroed.vcl
 	call errorit;
-
-	## Googlebot and amp_taxonomy errors
-        # created by include/clean_up.vcl
-        #if (resp.status == 200 && resp.reason == "Not an AMP endpoint.") {
-        #        set resp.http.Content-Type = "text/plain; charset=utf-8";
-        #        set resp.http.X-Robots-Tag = "noindex, nofollow";
-        #}	
 
 	## Needed here, I suppose
 	return (deliver);
