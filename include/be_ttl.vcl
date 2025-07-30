@@ -1,7 +1,8 @@
 sub be_ttled {
 
 	### vcl_backend_response
-	## This dictates which ones will be cached and how long
+	## This dictates which ones will be cached and how long.
+	## The last hit dictates what will be used.
 
 	## Ordinary default; how long Varnish will keep objects
         # Varnish is using beresp.ttl as s-maxage (max-age is for browser),
@@ -13,15 +14,17 @@ sub be_ttled {
 
                 # Set how long Varnish will keep it
 		# Varnish will keep cache very long time. Most of content never changes.
-		# there will be systen reboot, Varnish restarts and cache warmer and all those changes and refreshes
+		# There will be systen reboot or WordPress updates that does purge, as does Varnish restarts,
+		# and on other hand cache warmer and all those changes and refreshes
 		# the actual cache no matter this setting
                 set beresp.ttl = 52w;
 
-		# 24h for browsers, 365d for Varnish using beresp.ttl as a fallback. s-maxage is for other intermediate caches.
+		# 24h for browsers, 365d for Varnish using beresp.ttl as a fallback. 
+		# s-maxage is for other intermediate caches.
 		# This hits in if there is no cache-control in use
 		set beresp.http.Cache-Control = "public, max-age=86400, s-maxage=31536000;";
 
-                # Helps to group requests in varnishlog
+                # Helps to group requests in varnishlog. Just for debugging.
 		set beresp.http.X-Varnish = bereq.xid;
 	}	
 
@@ -36,13 +39,13 @@ sub be_ttled {
 			return(deliver);
 	}
 	
-	## Conditional 410 for url that may do come back
+	## Conditional 410 for urls that may do come back
 	call conditional410;
 
 	## 301 and 410 are quite steady, so let Varnish cache results from backend
 	# The idea here must be that first try doesn't go in cache, so let's do another round 
-	# and cache it using default values
-       if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
+	# and cache it using default values. 301 itself isn't cached, only result.
+        if (beresp.status == 301 && beresp.http.location ~ "^https?://[^/]+/") {
 		if (bereq.retries == 0) {
 			set bereq.http.host = regsuball(beresp.http.location, "^https?://([^/]+)/.*", "\1");
 			set bereq.url = regsuball(beresp.http.location, "^https?://([^/]+)", "");
@@ -58,9 +61,12 @@ sub be_ttled {
 		set beresp.ttl = 52w;
 	}
 
-	### Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se. 
+	### Caching static files improves cache ratio, but eats RAM and doesn't make your site faster per se.
+	## But it saves some work of backen. 
 
-	## First I deal with content types, kind of semi-defaults
+	## First I deal with content types, kind of semi-defaults. Then I set file types for most used ones.
+	# Why? Because for various reasons, but mainly because we don't get Content Type if a file is requested
+	# directly, i.e. by cache warmer.
 
         # Fonts don't change, is needed everywhere and are small
         if (beresp.http.Content-Type ~ "^font/") {
@@ -70,6 +76,13 @@ sub be_ttled {
                 set beresp.ttl = 52w;
         }
 
+	if (bereq.url ~ "\.(ttf|woff)") {
+		unset beresp.http.Cache-Control;
+                unset beresp.http.set-cookie;
+                set beresp.http.Cache-Control = "public, max-age=2592000"; # 1 month
+                set beresp.ttl = 52w;
+	}
+
         # Images don't change but takes space from users' devices
         if (beresp.http.Content-Type ~ "^image/") {
                 unset beresp.http.set-cookie;
@@ -78,11 +91,18 @@ sub be_ttled {
                 set beresp.ttl = 52w;
         }
 
-       # Large static files are delivered directly to the end-user without waiting for Varnish to fully read
+	if (bereq.url ~ "\.(jpg|jpeg|png|webp|svg|ico)") {
+		unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=172800s"; # 2d
+                set beresp.ttl = 52w;
+	}
+
+        # Large static files are delivered directly to the end-user without waiting for Varnish to fully read
         # Most of these should be in CDN, but I have some MP3s behind backend
         # Is this really needed anymore? AFAIK Varnish should do this automatic.
         # I shouldn't have any local videos, though
-        if (beresp.http.Content-Type ~ "^(video/)") {
+        if (beresp.http.Content-Type ~ "^(video/)" || bereq.url ~ "\.mp4") {
                 unset beresp.http.set-cookie;
                 unset beresp.http.Cache-Control;
                 set beresp.uncacheable = true;
@@ -92,7 +112,7 @@ sub be_ttled {
                 set beresp.http.X-Cache-Control = "pass: streamed video";
         }
         # this is for local audio only, if any
-        if (beresp.http.Content-Type ~ "^(audio)/") {
+        if (beresp.http.Content-Type ~ "^(audio)/" || bereq.url ~ "\.mp3") {
                 unset beresp.http.set-cookie;
                 unset beresp.http.Cache-Control;
                 set beresp.http.Cache-Control = "public, max-age=7200s"; # 2h
@@ -108,14 +128,21 @@ sub be_ttled {
                 set beresp.ttl = 30d;
         }
 
-	## Second: static files will overdrive content type, if there is a match
-
-	# CSS/JS may change when updating. But WordPress will purge cache when updated, so mainly I'm taking care users here.
+	# CSS/JS may change when updating. But WordPress will purge cache when updated, 
+	# so mainly I'm taking care users here.
 	if (bereq.url ~ "\.(css|js)") {
 		unset beresp.http.set-cookie;
 		unset beresp.http.Cache-Control;
 		set beresp.http.Cache-Control = "public, max-age=1209600"; # 2w client
 		set beresp.ttl = 52w;
+	}
+
+	# HTML itself too, of course, if there is any
+	if (bereq.url ~ "\.html") {
+		unset beresp.http.set-cookie;
+                unset beresp.http.Cache-Control;
+                set beresp.http.Cache-Control = "public, max-age=172800s"; # 2d
+                set beresp.ttl = 52w;
 	}
 
         # These can be really big and not so often requested. And if there is a rush, those can be fetched
@@ -203,13 +230,8 @@ sub be_ttled {
                 set beresp.ttl = 52w;
         }
 
-        ## I'm trying to understand why some images get low TTL
-        # log ttl of the most used images. Here we can log only misses, because hits never arrived here
-        if (bereq.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$" && beresp.ttl < 52w) {
-                # from the backend, aka. miss
-                std.log("IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl);
-		std.syslog(150, "IMAGE_TTL_BACKEND: " + bereq.url + " TTL=" + beresp.ttl); 
-        }
-
+        ## Debug rules if in use
+	call be_ttl_debug;
+        
 ## End of this one
 }

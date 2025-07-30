@@ -99,6 +99,7 @@ include "/etc/varnish/include/be_start.vcl";
 
 # vcl_backend_response, part II - TTL
 include "/etc/varnish/include/be_ttl.vcl";
+include "/etc/varnish/include/backend_response/be_ttl_debug.vcl";
 
 # vcl_backend_response, part III
 include "/etc/varnish/include/be_end.vcl";
