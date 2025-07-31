@@ -46,21 +46,6 @@ add_action('send_headers', function () {
     // Sidebar on every page
     $tags[] = 'sidebar';
 
-    // Domain (list every site here, just for easier copying; no, I'm not a skillful coder'
-    if (!empty($_SERVER['HTTP_HOST'])) {
-        if (strpos($_SERVER['HTTP_HOST'], 'poochierevival') !== false) {
-            $tags[] = 'domain-poochie';
-        } elseif (strpos($_SERVER['HTTP_HOST'], 'katiska') !== false) {
-            $tags[] = 'domain-katiska';
-        } elseif (strpos($_SERVER['HTTP_HOST'], 'eksis') !== false) {
-            $tags[] = 'domain-eksis';
-        } elseif (strpos($_SERVER['HTTP_HOST'], 'jagster') !== false) {
-            $tags[] = 'domain-jagster';
-        } elseif (strpos($_SERVER['HTTP_HOST'], 'dev') !== false) {
-            $tags[] = 'domain-dev';
-        }
-    }
-
     // Add the header
     if (!headers_sent() && !empty($tags)) {
         header('X-Cache-Tags: ' . implode(',', array_unique($tags)));

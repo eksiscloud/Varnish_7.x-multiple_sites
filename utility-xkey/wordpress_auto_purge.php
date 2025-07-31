@@ -13,13 +13,6 @@ add_action('save_post', function ($post_id) {
     $tags[] = 'sidebar';
     $tags[] = 'frontpage';
 
-    $host = parse_url(home_url(), PHP_URL_HOST);
-    if (strpos($host, 'poochierevival') !== false) {
-        $tags[] = 'domain-poochie';
-    } elseif (strpos($host, 'katiska') !== false) {
-        $tags[] = 'domain-katiska';
-    }
-
     // Categories
     $categories = get_the_category($post_id);
     if (!empty($categories)) {
