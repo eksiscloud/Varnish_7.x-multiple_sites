@@ -37,7 +37,7 @@ for site in "${sites[@]}"; do
         varnishadm vcl.label "$site" "$vclname"
         echo -e "✓ Label has set: $site → $vclname"
         echo
-    sleep 0.2
+    sleep 0.5
     else
         echo "✗ ERROR: VCL loading failed for $site"
     fi
