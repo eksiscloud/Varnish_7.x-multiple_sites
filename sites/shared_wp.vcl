@@ -95,7 +95,13 @@ include "/etc/varnish/include/hited.vcl";
 include "/etc/varnish/include/purged.vcl";
 
 # vcl_backend_response, part I
-include "/etc/varnish/include/be_start.vcl";
+include "/etc/varnish/include/backend_response/1-start.vcl";
+
+# vcl_backend_response, part II - snapshot-server
+include "/etc/varnish/include/backend_response/2-snapshot.vcl";
+
+# vcl_backend_response, part III - xkey
+include "/etc/varnish/include/backend_response/3-xkey.vcl";
 
 # vcl_backend_response, part II - TTL
 include "/etc/varnish/include/be_ttl.vcl";
@@ -358,10 +364,14 @@ sub vcl_backend_fetch {
 
 sub vcl_backend_response {
 
-	## First part
-	# include/be_start.vcl
-	call be_started;
+	## Backend names, admin side when sick
+	call start-1;
 
+	## Backend down, move to snapshot-server
+	call snapshot-2;
+
+	## Set xkey
+	call xkey-3;
 	## Second part, TTLs
 	# include/be_ttl.vcl
 	call be_ttled;
