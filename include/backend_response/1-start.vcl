@@ -13,13 +13,5 @@ sub start-1 {
 	set beresp.http.x-url = bereq.url;
 	set beresp.http.x-host = bereq.http.host;
 	
-	## Will kick in if backend is sick
-	if (bereq.url ~ "^/wp-json/" || bereq.url ~ "^/wp-admin/") {
-		# no grace for admins
-		set beresp.grace = 0s;
-	} else {
-	        set beresp.grace = 12h;
-	}
-
 ## The end is here
 }
