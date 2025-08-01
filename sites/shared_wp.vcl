@@ -103,15 +103,16 @@ include "/etc/varnish/include/backend_response/2-snapshot.vcl";
 # vcl_backend_response, part III - xkey
 include "/etc/varnish/include/backend_response/3-xkey.vcl";
 
-# vcl_backend_response, part II - TTL
-include "/etc/varnish/include/be_ttl.vcl";
-include "/etc/varnish/include/backend_response/be_ttl_debug.vcl";
+# vcl_backend_response, part IV - TTL
+include "/etc/varnish/include/backend_response/4-ttl.vcl";
+include "/etc/varnish/include/backend_response/conditional410.vcl";
+include "/etc/varnish/include/backend_response/ttl_debug.vcl";
 
-# vcl_backend_response, part III
-include "/etc/varnish/include/be_end.vcl";
+# vcl_backend_response, part V - vary
+include "/etc/varnish/include/backend_response/5-vary.vcl";
 
-# vcl_backend_response, pat IV, xkey
-include "/etc/varnish/include/x-key.vcl";
+# vcl_backend_response, part VI
+include "/etc/varnish/include/backend_response/6-end.vcl";
 
 # vcl_backend_error
 include "/etc/varnish/include/backend_error/be_fail.vcl";
@@ -129,9 +130,6 @@ include "/etc/varnish/include/showed.vcl";
 include "/etc/varnish/include/erroed.vcl";
 
 ## ext are something extra
-
-# Conditional 410
-include "/etc/varnish/ext/410conditional.vcl";
 
 # CORS can be handful, so let's give own VCL
 include "/etc/varnish/ext/cors.vcl";
@@ -372,19 +370,19 @@ sub vcl_backend_response {
 
 	## Set xkey
 	call xkey-3;
-	## Second part, TTLs
-	# include/be_ttl.vcl
-	call be_ttled;
 
-	## Third part
-	# include/be_end.vcl
-	call be_ended;
+	## TTLs and uncacheables
+	call ttl-4;
 
-	## Fourh part, xkey
-	call ban-tags;
+	## Vary
+	call vary-5;
 
-	## We are at the end
+	## Last one, unset something
+	call end-6;
+
+# We are at the end
 }
+
 
 #######################vcl_backend_error###############
 ## Tells what to when backend doesn`t give suitable answers and backend_response can't do anything
@@ -397,6 +395,7 @@ sub vcl_backend_error {
 
 # We are ready here
 }
+
 
 #######################vcl_deliver#####################
 #
