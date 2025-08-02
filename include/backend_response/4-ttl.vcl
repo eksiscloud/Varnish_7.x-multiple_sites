@@ -32,6 +32,8 @@ sub ttl-4 {
         # In-build, not needed. On other hand, it sends uncacheable right away to user.
         if (bereq.method == "POST") {
                 set beresp.uncacheable = true;
+		# do hit-for-miss fo an hour
+		set beresp.ttl = 3600s; 
                 return(deliver);
         }
 
@@ -53,7 +55,8 @@ sub ttl-4 {
 		bereq.url ~ "preview=true") {
 			unset beresp.http.Cache-Control;
 			set beresp.http.Cache-Control = "no-store, no-cache, must-revalidate, max-age=0";
-			set beresp.ttl = 0s;
+			# hit-for-miss, could be longer than a day
+			set beresp.ttl = 1d;
 			return(deliver);
 	}
 	
@@ -124,7 +127,8 @@ sub ttl-4 {
                 unset beresp.http.set-cookie;
                 unset beresp.http.Cache-Control;
                 set beresp.uncacheable = true;
-                set beresp.ttl = 0s;
+		# 1 hrs hit-for-miss
+                set beresp.ttl = 3600s;
                 set beresp.do_stream = true;
                 # for clarity and logging
                 set beresp.http.X-Cache-Control = "pass: streamed video";
