@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Uses varnish-mp3-miss.service (disabled)
+
 # Create the log if needed
 mkdir -p /var/log/varnish
 LOGFILE="/var/log/varnish/mp3_miss.log"
