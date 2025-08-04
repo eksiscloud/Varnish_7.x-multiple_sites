@@ -1,4 +1,4 @@
-sub showit {
+sub showed {
 
 	### The last part of vcl_deliver, manipulating headers etc.
 

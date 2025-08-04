@@ -1,4 +1,4 @@
-sub errorit {
+sub errored {
 
 	### vcl_synth
 
