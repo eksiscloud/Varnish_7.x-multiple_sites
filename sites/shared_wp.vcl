@@ -92,7 +92,7 @@ include "/etc/varnish/include/recv/8-ban_purge.vcl";
 #include "/etc/varnish/include/hited.vcl";
 
 # vcl_purge
-include "/etc/varnish/include/purged.vcl";
+#include "/etc/varnish/include/purged.vcl";
 
 # vcl_backend_response, part I
 #include "/etc/varnish/include/backend_response/1-start.vcl";
@@ -118,13 +118,13 @@ include "/etc/varnish/include/backend_response/ttl_debug.vcl";
 #include "/etc/varnish/include/backend_error/be_fail.vcl";
 
 # vcl_deliver, part I
-include "/etc/varnish/include/delivered.vcl";
+#include "/etc/varnish/include/delivered.vcl";
 
 # vcl_deliver, part II, counters
 #include "/etc/varnish/include/counters.vcl";
 
 # vcl_deliver, part III, headers
-include "/etc/varnish/include/showed.vcl";
+#include "/etc/varnish/include/showed.vcl";
 
 # vcl_synth, all errors
 include "/etc/varnish/include/erroed.vcl";
@@ -132,10 +132,10 @@ include "/etc/varnish/include/erroed.vcl";
 ## ext are something extra
 
 # CORS can be handful, so let's give own VCL
-include "/etc/varnish/ext/cors.vcl";
+#include "/etc/varnish/ext/cors.vcl";
 
 # Some security related headers
-include "/etc/varnish/ext/security.vcl";
+include "/etc/varnish/include/security.vcl";
 
 ## Debugs
 #include /etc/varnish/include/debug/wordpress_debug.vcl
@@ -734,29 +734,152 @@ sub vcl_backend_error {
 
 
 #######################vcl_deliver#####################
+# Now the content is fetched from the backend or cache and is ready to be delivered to users
 #
+
 sub vcl_deliver {
 
-	## Part I
-	# include/delivered.vcl
-	call deliverit;
+        ## Damn, backend is down (or the request is not allowed; almost same thing)
+        if (resp.status == 503) {
+                return(restart);
+        }
+        
+        ## Knockers with 404 will get synthetic error 666 that leads to real error 666
+        if (resp.status == 666) {
+                return(synth(666, "Requests not allowed for " + req.url));
+        }
 
-	## Let's add the origin by cors.vcl, if needed
-	# ext/cors.vcl
-	call cors_deliver;
+        ## Just some unneeded headers showing unneeded data
+
+        # HIT & MISS
+        if (obj.uncacheable) {
+                set req.http.x-cache = req.http.x-cache + " uncacheable" ;
+        } else {
+                set req.http.x-cache = req.http.x-cache + " cached" ;
+        }
+        # uncomment the following line to show the information in the response
+        set resp.http.x-cache = req.http.x-cache;
+
+        if (obj.hits > 0) {
+                # I don't fancy boring hit/miss announcements
+                set resp.http.You-had-only-one-job = "Success";
+        } else {
+                set resp.http.You-had-only-one-job = "Phew";
+        }
+
+        # Show hit counts (per objecthead)
+        # Same here, something like X-total-hits is just boring
+        if (obj.hits > 0) {
+                set resp.http.Footprint-of-CO2 = (obj.hits) + " metric-tons";
+        } else {
+                set resp.http.Footprint-of-CO2 = "Greenwash in progress";
+        }
+
+        ## Debug for 403
+        #if (resp.status == 403) {
+        #       call debug_headers;
+        #}
+
+        ## Logs short and close to expire TTLs
+        if (obj.ttl < 3600s && !obj.uncacheable) {
+                std.log("SHORT_TTL_DELIVER: " + req.url +
+                        " HIT/MISS=" + resp.http.X-Cache +
+                        " TTL=" + obj.ttl);
+        }
+
+        ## Logs ttl of the most used images
+        if (req.url ~ "(?i)\.(jpeg|jpg|png|webp)(\?.*)?$") {
+                std.log("IMAGE_TTL_DELIVER: " + req.url +
+                        " HIT/MISS=" + resp.http.X-Cache +
+                        " TTL=" + obj.ttl);
+                std.syslog(150, "IMAGE_TTL_DELIVER: " + req.url +
+                                " HIT/MISS=" + resp.http.X-Cache +
+                                " TTL=" + obj.ttl);
+        }
+
+        ## Logs ttl of MP3s
+        if (req.url ~ "\.mp3(\?.*)?$") {
+                std.log("MP3_TTL_DELIVER: " + req.url +
+                        " HIT/MISS=" + resp.http.X-Cache +
+                        " TTL=" + obj.ttl);
+                std.syslog(150, "MP3_TTL_DELIVER: " + req.url +
+                                " HIT/MISS=" + resp.http.X-Cache +
+                                " TTL=" + obj.ttl);
+        }
+
+        ## And now I remove my helpful tag'ish
+        # Now something like this works:
+        # varnishlog -c -g request -i Req* -i Resp* -I Timestamp:Resp -x ReqAcct -x RespUnset -X "RespHeader:(x|X)-(url|host)" 
+        unset resp.http.x-url;
+        unset resp.http.x-host;
+#       unset resp.http.xkey;
+
+        ## Vary to browser
+        set resp.http.Vary = "Accept-Encoding";
+
+        ## Origin should send to browser
+        set resp.http.Vary = resp.http.Vary + ",Origin";
+
+        ## Set xkey visible
+        if (resp.http.X-Cache-Tags) {
+                set resp.http.X-Cache-Tags = resp.http.X-Cache-Tags;
+        }
+
+	## Outgoing part of cors
+        if (req.http.X-Saved-Origin) {
+                set resp.http.Access-Control-Allow-Origin = req.http.X-Saved-Origin;
+                set resp.http.Access-Control-Allow-Methods = "GET, POST, OPTIONS";
+                set resp.http.Access-Control-Allow-Headers = "Content-Type, Authorization";
+                set resp.http.Access-Control-Allow-Credentials = "true";
+                set resp.http.X-CORS-Debug = "Enabled for " + req.http.X-Saved-Origin;
+        } else {
+                unset resp.http.Access-Control-Allow-Origin;
+                unset resp.http.Access-Control-Allow-Methods;
+                unset resp.http.Access-Control-Allow-Headers;
+                unset resp.http.Access-Control-Allow-Credentials;
+                unset resp.http.X-CORS-Debug;
+        }
 
 	## A little bit more security using some headers
 	# CSP is done in WordPresses
-	# ext/addons/security.vcl
-	call sec_headers;
-	
-	## Some counters and that kind of stuff
-	# include/counters.vcl
-#	call countit;
-	
-	## Manipulating headers etc.
-	# include/showed.vcl
-	call showit;
+	call security;
+		
+        ## Last-Modified timestamp may be interesting for users, but unnecessary
+        # but I want to mask it a little bit, and show it, because I'm curious, even curiosity kills the cat
+        # Last-Modified comes only from backend. Cached content hasn't it.
+        if (!resp.http.Last-Modified || resp.http.Last-Modified == "") {
+                unset resp.http.Last-Modified;          
+        }
+        else {
+                set resp.http.those-good-old-days = resp.http.Last-Modified;
+                unset resp.http.Last-Modified;
+        }
+        
+        ## Just to be sure who is seeing what
+        if (req.http.x-bot) {
+                set resp.http.debug = req.http.x-bot;
+        }
+        
+        ## Expires and Pragma are unneeded because cache-control overrides it
+        unset resp.http.Expires;
+        unset resp.http.Pragma;
+        
+        ## Remove some headers, because the client doesn't need them
+        unset resp.http.Server;
+        unset resp.http.X-Powered-By;
+        unset resp.http.Via;
+        #unset resp.http.Link;
+        unset resp.http.X-Generator;
+        unset resp.http.x-url;
+        unset resp.http.x-host;
+        
+        # Why? I don't know
+        set resp.http.X-Varnish = req.http.X-Varnish;
+        unset resp.http.X-Varnish;
+        # Custom headers, not so serious thing 
+        set resp.http.Your-Agent = req.http.User-Agent;
+        set resp.http.Your-IP = req.http.X-Real-IP;
+        #set resp.http.Your-Language = req.http.Accept-Language;
 
 	## Don't show funny stuff to bots
 	if (req.http.x-bot == "visitor") {
@@ -764,23 +887,12 @@ sub vcl_deliver {
 		set resp.http.Your-IP-Country = std.toupper(req.http.X-Country-Code);
 	}
 
-	# That's it
-}
-
-
-#################vcl_purge######################
-#
-sub vcl_purge {
-
-	## vcl_purge
-	# include/purged.vcl
-	call purgeit;
-
-# End of vcl_purge
+# That's delivered
 }
 
 
 ##################vcl_synth######################
+# All synthetic errors
 #
 sub vcl_synth {
 
@@ -792,11 +904,11 @@ sub vcl_synth {
 	
 	## Must handle cors here too
 	# was: call cors; so exacly what cors should I call here? Fix this.
-	call cors_deliver;
+	# This I had, but can't understand why: call cors_deliver;
 	
 	## Synth errors, real on customs
 	# include/erroed.vcl
-	call errorit;
+	call errored;
 
 	## Needed here, I suppose
 	return (deliver);
