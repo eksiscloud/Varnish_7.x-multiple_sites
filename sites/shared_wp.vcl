@@ -26,22 +26,16 @@ import purge;		# Soft/hard purge by Varnish 7.x
 import xkey;		# another way to ban
 
 ## Includes are normally in vcl
-# www-domains need normalizing
-#include "/etc/varnish/include/recv/1-normalize_host.vcl";
 
 # Block using ASN
 include "/etc/varnish/include/recv/2-asn_blocklist_start.vcl";
 include "/etc/varnish/include/recv/2-1-asn_id.vcl";
 include "/etc/varnish/include/recv/asn_blocklist.vcl";
 
-# Let's cleanup first reseting headers etc., lightly
-#include "/etc/varnish/include/recv/3-clean_up.vcl";
-
 # Pure normalizing and similar, normally done first
 include "/etc/varnish/include/recv/4-normalize.vcl";
 
 # Cleaning user-agents
-#include "/etc/varnish/include/recv/5-user_agents.vcl";
 include "/etc/varnish/include/recv/5-1-real_users.vcl";
 include "/etc/varnish/include/recv/5-2-probes.vcl";
 include "/etc/varnish/include/recv/5-3-nice-bot.vcl";
@@ -61,102 +55,19 @@ include "/etc/varnish/include/recv/7-manipulate.vcl";
 # Is there ban or purge, and who can do it
 include "/etc/varnish/include/recv/8-ban_purge.vcl";
 
-# CORS can be handful, so let's give own VCL. This is for incoming requests
-#include "/etc/varnish/include/recv/9-cors.vcl";
-
-# Something must do before cookies are cleaned
-#include "/etc/varnish/include/recv/10-pre-wordpress.vcl";
-
-# Cleaning cookies for WordPress
-#include "/etc/varnish/include/recv/11-cookie_monster.vcl";
-
-# Setting up pipe/pass/hash etc. what WordPress wants
-#include "/etc/varnish/include/recv/12-wordpress.vcl";
-
-# There is still something to do before leaving vcl_recv
-#include "/etc/varnish/include/recv/13-wordpress_end.vcl";
-
-# vcl_pipe
-#include "/etc/varnish/include/piped.vcl";
-
-# vcl_miss
-#include "/etc/varnish/include/missed.vcl";
-
-# vcl_pass
-#include "/etc/varnish/include/passed.vcl";
-
-# vcl_hash
-#include "/etc/varnish/include/hashed.vcl";
-
-# vcl_hit
-#include "/etc/varnish/include/hited.vcl";
-
-# vcl_purge
-#include "/etc/varnish/include/purged.vcl";
-
-# vcl_backend_response, part I
-#include "/etc/varnish/include/backend_response/1-start.vcl";
-
-# vcl_backend_response, part II - snapshot-server
-#include "/etc/varnish/include/backend_response/2-snapshot.vcl";
-
-# vcl_backend_response, part III - xkey
-#include "/etc/varnish/include/backend_response/3-xkey.vcl";
-
 # vcl_backend_response, part IV - TTL
 include "/etc/varnish/include/backend_response/4-ttl.vcl";
 include "/etc/varnish/include/backend_response/conditional410.vcl";
 include "/etc/varnish/include/backend_response/ttl_debug.vcl";
 
-# vcl_backend_response, part V - vary
-#include "/etc/varnish/include/backend_response/5-vary.vcl";
-
-# vcl_backend_response, part VI
-#include "/etc/varnish/include/backend_response/6-end.vcl";
-
-# vcl_backend_error
-#include "/etc/varnish/include/backend_error/be_fail.vcl";
-
-# vcl_deliver, part I
-#include "/etc/varnish/include/delivered.vcl";
-
-# vcl_deliver, part II, counters
-#include "/etc/varnish/include/counters.vcl";
-
-# vcl_deliver, part III, headers
-#include "/etc/varnish/include/showed.vcl";
-
 # vcl_synth, all errors
 include "/etc/varnish/include/erroed.vcl";
-
-## ext are something extra
-
-# CORS can be handful, so let's give own VCL
-#include "/etc/varnish/ext/cors.vcl";
 
 # Some security related headers
 include "/etc/varnish/include/security.vcl";
 
 ## Debugs
 #include /etc/varnish/include/debug/wordpress_debug.vcl
-
-## Probes are watching if backends are healthy
-## You can check if a backend is  healthy or sick:
-## varnishlog -g raw -i Backend_health
-
-#probe sondi {
-    #.url = "/healthcheck.txt";  # or you can use just an url
-	# you must have installed libwww-perl:
-#    .request =
-#      "GET /healthcheck.txt HTTP/1.1"
-#      "Host: www.katiska.eu"		# It controls whole backend using one site; not the best option
-#      "Connection: close"
-#      "User-Agent: Varnish Health Probe";
-#	.timeout = 5s;
-#	.interval = 4s;
-#	.window = 5;
-#	.threshold = 3;
-#}
 
 ## Backend tells where a site can be found
 
