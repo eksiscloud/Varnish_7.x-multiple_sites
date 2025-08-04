@@ -27,7 +27,7 @@ import xkey;		# another way to ban
 
 ## Includes are normally in vcl
 # www-domains need normalizing
-include "/etc/varnish/include/recv/1-normalize_host.vcl";
+#include "/etc/varnish/include/recv/1-normalize_host.vcl";
 
 # Block using ASN
 include "/etc/varnish/include/recv/2-asn_blocklist_start.vcl";
@@ -35,13 +35,13 @@ include "/etc/varnish/include/recv/2-1-asn_id.vcl";
 include "/etc/varnish/include/recv/asn_blocklist.vcl";
 
 # Let's cleanup first reseting headers etc., lightly
-include "/etc/varnish/include/recv/3-clean_up.vcl";
+#include "/etc/varnish/include/recv/3-clean_up.vcl";
 
 # Pure normalizing and similar, normally done first
 include "/etc/varnish/include/recv/4-normalize.vcl";
 
 # Cleaning user-agents
-include "/etc/varnish/include/recv/5-user_agents.vcl";
+#include "/etc/varnish/include/recv/5-user_agents.vcl";
 include "/etc/varnish/include/recv/5-1-real_users.vcl";
 include "/etc/varnish/include/recv/5-2-probes.vcl";
 include "/etc/varnish/include/recv/5-3-nice-bot.vcl";
@@ -62,19 +62,19 @@ include "/etc/varnish/include/recv/7-manipulate.vcl";
 include "/etc/varnish/include/recv/8-ban_purge.vcl";
 
 # CORS can be handful, so let's give own VCL. This is for incoming requests
-include "/etc/varnish/include/recv/9-cors.vcl";
+#include "/etc/varnish/include/recv/9-cors.vcl";
 
 # Something must do before cookies are cleaned
-include "/etc/varnish/include/recv/10-pre-wordpress.vcl";
+#include "/etc/varnish/include/recv/10-pre-wordpress.vcl";
 
 # Cleaning cookies for WordPress
-include "/etc/varnish/include/recv/11-cookie_monster.vcl";
+#include "/etc/varnish/include/recv/11-cookie_monster.vcl";
 
 # Setting up pipe/pass/hash etc. what WordPress wants
-include "/etc/varnish/include/recv/12-wordpress.vcl";
+#include "/etc/varnish/include/recv/12-wordpress.vcl";
 
 # There is still something to do before leaving vcl_recv
-include "/etc/varnish/include/recv/13-wordpress_end.vcl";
+#include "/etc/varnish/include/recv/13-wordpress_end.vcl";
 
 # vcl_pipe
 include "/etc/varnish/include/piped.vcl";
@@ -203,9 +203,26 @@ sub vcl_recv {
 	## All normal and we use this backend
 	set req.backend_hint = sites;
 
-	## Normalize hostname to avoid double caching
-	# only for www-domains
-	call normalize_host-1;
+        ## Just normalizing host names
+        # I like to keep triple-w
+
+        set req.http.host = regsub(req.http.host,
+        "^katiska\.eu$", "www.katiska.eu");
+
+        set req.http.host = regsub(req.http.host,
+        "^eksis\.one$", "www.eksis.one");
+
+        set req.http.host = regsub(req.http.host,
+        "^poochierevival\.info$", "www.poochierevival.info");
+
+        ## Give 127.0.0.1 to X-Real-IP if curl is used from localhost
+        # (std.ip(req.http.X-Real-IP, "0.0.0.0") goes to fallbck when curl is used from localhost and fails
+        # Because Nginx acts as a reverse proxy, client.ip is always its IP.
+        # Now we get some IP when worked from home shell
+        # This should or could be among other normalizin, but I want this before bot filtering
+        if (!req.http.X-Real-IP || req.http.X-Real-IP == "") {
+                set req.http.X-Real-IP = client.ip;
+        }
 
         ## just for these virtual hosts
         # for stop caching uncomment
@@ -225,14 +242,33 @@ sub vcl_recv {
 	# Nginx deals with countries and user-agents, but one is left: ASN
 	call asn_blocklist_start-2;
 
-	## Few small things as reseting headers  before we start working
-	call clean_up-3;
+        ## Tidying a little bit places before the work starts.
+        # Reset hit/miss counter
+        unset req.http.x-cache;
+
+        # Just to on safe side, if there is i.e. return(pass/restart) that comes from a situation that can mess things
+        unset req.http.X-Saved-Origin;
 
 	## Normalizing, part 1
 	call normalize-4;
 
-	## Users and bots, so let's normalize user-agent, mostly just for easier reading of varnishlog etc.
-        call user_agents-5;
+        ## Central station for tidying user-agents.
+        ## I could normalize UA, but nowadays I leave is as it is, and adding two x-headers:
+        ## x-bot and x-user-agent
+
+        # These should be marked as real users, but some aren't
+        call real_users-5-1;
+
+        # Technical probes
+        # These are useful and I want to know if backend is working etc.
+        if (req.http.x-bot != "visitor") {
+                call probes-5-2;
+        }
+
+        # These are nice bots, and I'm normalizing UA a bit
+        if (req.http.x-bot !~ "(visitor|tech)$") {
+                call nice-bots-5-3;
+        }
 		
 	## Huge list of urls and pages that are constantly knocked
 	# There is no one to listening, but those are still hammering backend
@@ -259,28 +295,163 @@ sub vcl_recv {
 	}
 	
 	## Setup CORS
-	call cors-9;
+	# Incoming
+        if (req.http.Origin) {
+                std.log("CORS check: incoming request with Origin: " + req.http.Origin + " → URL: " + req.url);
 
-        ## These must, should or could do before cookie monster
-        call pre-wordpress-10;
+        # Whitelist allowed origins using regular expression
+        if (req.http.Origin ~ "^(https://www\.katiska\.eu|https://www\.eksis.\.one|https://www\.poochierevival\.info)$") {
+                set req.http.X-Saved-Origin = req.http.Origin;
+                std.log("CORS accepted: " + req.http.Origin);
+        } else {
+                std.log("CORS denied: " + req.http.Origin);
+                }
+        }
 
-        ## The infamous Cookie Monster
-        call cookie_monster-11;
+	### WordPress related
 
-	## Everything what a WordPress needs
-	call wordpress-12;
+        ## Fix Wordpress visual editor and login issues, must be the first url pass requests and
+        # before cookie monster to work.
+        # Backend of Wordpress
+        if (req.url ~ "^/wp-(login|admin|cron|comments-post\.php)" || req.url ~ "(preview=true|/login|/my-account)") {
+                return(pass);
+        }
+
+        ## Don't cache logged-in user, password reseting and posts behind password
+        if (req.http.Cookie ~ "wordpress_logged_in_" || req.http.Cookie ~ "wp-postpass_" || req.http.Cookie ~ "resetpass") {
+                return(pass);
+        }
+
+        ## Don't cache auth, i.e. if REST API needs it.
+        if (req.http.Authorization) {
+                return(pass);
+        }
+
+        ## Cookie monster: Keeping needed cookies and deleting rest.
+        if (req.http.cookie) {
+                cookie.parse(req.http.cookie);
+
+                # Remove analytics and follower cookies
+                # AFAIK this not needed, because next logic says what cookies are allowed and dumps rest
+                cookie.delete("__utm, _ga, _gid, _gat, _gcl, _fbp, fr, _pk_, FCNEC, __eoi");
+
+                # Keep necessary WordPress cookies
+                cookie.keep("wordpress_logged_in_,wp-settings,wp-settings-time,_wp_session,resetpass");
+
+                set req.http.cookie = cookie.get_string();
+
+                # Don' let empty cookies travel any further
+                if (req.http.cookie == "") {
+                        unset req.http.cookie;
+                }
+        }
+
+
+        ## Implementing websocket support
+        if (req.http.Upgrade ~ "(?i)websocket") {
+                return(pipe);
+        }
+
+        ## Only GET and HEAD are cacheable methods AFAIK
+        # In-build rule too
+        if (req.method != "GET" && req.method != "HEAD") {
+                return(pass);
+        }
+
+        ## Cache warmup
+        # wget --spider -o wget.log -e robots=off -r -l 5 -p -S -T3 --header="X-Bypass-Cache: 1" --header="User-Agent:CacheWarmer">
+        # It saves a lot of directories, so think where you are before launching it... A protip: /tmp
+        if (req.http.X-Bypass-Cache == "1") {
+                return(pass);
+        }       
+
+        ## Enable smart refreshing, aka. ctrl+F5 will flush that page
+        # Remember your header Cache-Control must be set something else than no-cache
+        # Otherwise everything will miss
+        if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "1" && req.http.Cookie) {
+                set req.hash_always_miss = true;
+        }
+
+        ## Do not cache AJAX requests.
+        if (req.http.X-Requested-With == "XMLHttpRequest") {
+                return(pass);
+        }
+
+        ## Don't cache wordpress related pages
+        if (req.url ~ "^/(signup|activate|mail|logout)(/|$)") {
+                return(pass);
+        }
+
+        ## Adsense incomings are lower when Varnish is on, trying to solve out this
+        # is it because of caching or CSP-rules?
+        if (req.url ~ "adsbygoogle") {
+                return(pass);
+        }
+
+        # .well-known API route should not be cached
+        if (req.url ~ "^/.well-known/") {
+                return(pass);
+        }
+
+        ## WordPress REST API
+        if (req.url ~ "^/wp-json/wp/") {
+            if (req.http.Authorization) {
+                return (pass);
+            }
+            if (req.http.Cookie ~ "wordpress_logged_in") {
+                return (pass);
+            }
+            return (synth(403, "Unauthorized request"));
+        }
+
+        ## Normalize the query arguments.
+        # I'm excluding admin, because otherwise it will cause issues.
+        # If std.querysort is any earlier it will break things, like giving error 500 when logging out.
+        # Every other VCL examples use this really early, but those are really aged tips and 
+        # I'm not so sure if those are actually ever tested in production.
+        # Done after all passes and before the first hash.
+        if (req.url !~ "^/wp-(admin|login)" && req.url !~ "/logout") {
+                set req.url = std.querysort(req.url);
+        }
+
+        
+        ## Remove query strings from some static files
+        if (req.url ~ "\.(?:png|jpg|jpeg|webp|gif|css|js|woff2?)\?.*") {
+                set req.url = regsub(req.url, "\?.*", "");
+        }
+
+        ## Hit everything else
+        # First, bye bye cookies
+        if (req.url !~ "(wp-(login.php|cron.php|admin|comment)|login|my-account|addons|loggedout|lost-password)") {
+                unset req.http.cookie;
+        }
 
 	# If needed
 	#call wordpress_debug;
 
-	## Last things to set up
-	call wordpress_end-13;
+
+        ## Let's clean User-Agent, just to be on safe side
+        # It will come back at vcl_hash, but without separate caching
+        # I want send User-Agent to backend because that is the only way to show who is actually getting error 404; 
+        # I don't serve bots  and 404 from real users must fix right away
+        set req.http.x-agent = req.http.User-Agent;
+        if (req.http.x-bot !~ "(nice|tech|bad|visitor)") { set req.http.x-bot = "visitor"; }
+        unset req.http.User-Agent;
+
+        ## Because vmod Accept isn't in use, we have to remove Accept-Language, because there is no need to cache with it.
+        # Let's tranfer to response anyway
+        set req.http.x-language = req.http.Accept-Language;
+        unset req.http.Accept-Language;
+
+        ## I don't need separated caches used by country code, but I use it in responses
+        set req.http.x-country = req.http.X-Country-Code;
+        unset req.http.X-Country-Code;
 
 	## Cache all others requests if they reach this point.
-	# Needed because of all return jumps.
+	# I'm still thinking if bypassing in-build logic this way is a smart move.
 	return(hash);
 
-# End of this one	
+# End of recv	
 } 
 
 
