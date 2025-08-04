@@ -77,31 +77,31 @@ include "/etc/varnish/include/recv/8-ban_purge.vcl";
 #include "/etc/varnish/include/recv/13-wordpress_end.vcl";
 
 # vcl_pipe
-include "/etc/varnish/include/piped.vcl";
+#include "/etc/varnish/include/piped.vcl";
 
 # vcl_miss
-include "/etc/varnish/include/missed.vcl";
+#include "/etc/varnish/include/missed.vcl";
 
 # vcl_pass
-include "/etc/varnish/include/passed.vcl";
+#include "/etc/varnish/include/passed.vcl";
 
 # vcl_hash
-include "/etc/varnish/include/hashed.vcl";
+#include "/etc/varnish/include/hashed.vcl";
 
 # vcl_hit
-include "/etc/varnish/include/hited.vcl";
+#include "/etc/varnish/include/hited.vcl";
 
 # vcl_purge
 include "/etc/varnish/include/purged.vcl";
 
 # vcl_backend_response, part I
-include "/etc/varnish/include/backend_response/1-start.vcl";
+#include "/etc/varnish/include/backend_response/1-start.vcl";
 
 # vcl_backend_response, part II - snapshot-server
-include "/etc/varnish/include/backend_response/2-snapshot.vcl";
+#include "/etc/varnish/include/backend_response/2-snapshot.vcl";
 
 # vcl_backend_response, part III - xkey
-include "/etc/varnish/include/backend_response/3-xkey.vcl";
+#include "/etc/varnish/include/backend_response/3-xkey.vcl";
 
 # vcl_backend_response, part IV - TTL
 include "/etc/varnish/include/backend_response/4-ttl.vcl";
@@ -109,13 +109,13 @@ include "/etc/varnish/include/backend_response/conditional410.vcl";
 include "/etc/varnish/include/backend_response/ttl_debug.vcl";
 
 # vcl_backend_response, part V - vary
-include "/etc/varnish/include/backend_response/5-vary.vcl";
+#include "/etc/varnish/include/backend_response/5-vary.vcl";
 
 # vcl_backend_response, part VI
-include "/etc/varnish/include/backend_response/6-end.vcl";
+#include "/etc/varnish/include/backend_response/6-end.vcl";
 
 # vcl_backend_error
-include "/etc/varnish/include/backend_error/be_fail.vcl";
+#include "/etc/varnish/include/backend_error/be_fail.vcl";
 
 # vcl_deliver, part I
 include "/etc/varnish/include/delivered.vcl";
@@ -459,11 +459,16 @@ sub vcl_recv {
 #
 sub vcl_pipe {
 
-	## Whole vcl_pipe
-	# include/piped.vcl
-	call pipeit;
+        ## Pipe counter
+        set req.http.x-cache = "pipe uncacheable";
 
-	## The end of the road
+        ## Implementing websocket support
+        if (req.http.upgrade) {
+                set bereq.http.upgrade = req.http.upgrade;
+                set bereq.http.connection = req.http.connection;
+        }
+
+# The end of the pipe
 }
 
 
@@ -471,10 +476,10 @@ sub vcl_pipe {
 #
 sub vcl_pass {
 
-	## Whole vcl_pass
-	# include/passed.vcl
-	call passit;
+        ## Pass counter
+        set req.http.x-cache = "pass";
 
+# the pass ends here
 }
 
 
@@ -482,16 +487,40 @@ sub vcl_pass {
 #
 sub vcl_hash {
 
-	## Whole vcl_pass
-	# include include/hashed.vcl
-	call hashit;
+        ## Caching per language, that's why we normalized this
+        # Because I don't have multilingual, I clean Accept-Language
+        # I have one site pure English, but is not Content-Language enough?
+        #hash_data(req.http.Accept-Language);
 
-	## The end
+        ## Return of User-Agent and Accept-Language, but without caching
+        
+        # Now I can send User-Agent to backend for 404 logging etc.
+        # Vary must be cleaned of course
+        if (req.http.x-agent) {
+                set req.http.User-Agent = req.http.x-agent;
+                unset req.http.x-agent;
+        }
+        
+        # Same thing with Accept-Language
+        if (req.http.x-language) {
+                set req.http.Accept-Language = req.http.x-language;
+                unset req.http.x-language;
+        }
+
+        # And again with X-Country-Code
+	# I reckon this is totally unnecessary. X-headers aren't user for hash/caching per se.
+        if (req.http.x-country) {
+                set req.http.X-Country-Code = req.http.c-country;
+                unset req.http.x-country;
+        }
+
+# The end for hash
 
 	# HEADS UP!
-	# Allowing lookup will bypass in-build rules, and then you MUST hash host, server and url.
+	# Allowing lookup here will bypass in-build rules, and then you MUST hash host, server and url.
 	# If you not, your cache will be totally mess.
 #	return(lookup);
+
 }
 
 
@@ -499,11 +528,25 @@ sub vcl_hash {
 #
 sub vcl_hit {
 
-	## vcl_hit
-	# include/hited.vcl
-	call hitit;
+        ## Pure hit
+        if (obj.ttl >= 0s) {
+            set req.http.x-cache = "hit";
+            return (deliver);
+        }
+
+        ## Out of TTL, but is under grace
+	# I'm using very short grace, like 15 secs or something
+        if (obj.ttl <= 0s && obj.grace > 0s) {
+            set req.http.x-cache = "hit graced";
+            std.log("HIT grace: " + req.url);
+            return (deliver);
+        }
+
+        ## Banned or badly stale
+        std.log("Banned HIT, fetch fresh copy: " + req.url);
+        return (pass);	
 	
-	## End of the road, Jack
+# End of the hit, Jack
 }
 
 
@@ -511,21 +554,25 @@ sub vcl_hit {
 #
 sub vcl_miss {
 
-	### vcl_miss
-	# include/missed.vcl
-	call missit;
+        ## Miss counter
+        set req.http.x-cache = "miss";
 
-	## Last call
+# Last call miss
 }
+
 
 ###################vcl_backend_fetch###############
 #
 sub vcl_backend_fetch {
 
+	## Used when backend is down, and extra header is needed for Nginx
 	if (bereq.backend == snapshot) {
              set bereq.http.X-Emergency-Redirect = "true";
 	}
+
+# fetch stops here
 }
+
 
 ###################vcl_backend_response#############
 # This will alter everything what a backend responses back to Varnish
@@ -533,25 +580,126 @@ sub vcl_backend_fetch {
 
 sub vcl_backend_response {
 
-	## Backend names, admin side when sick
-	call start-1;
+        ## Add name of backend in varnishncsa log. The name is shown only if backend responds.
+        # You can find slow replying backends (over 3 sec) with that:
+        # varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' | awk '$7 > 3 {print}'
+        # or
+        # varnishncsa -b -F '%t "%r" %s %{Varnish:time_firstbyte}x %{VCL_Log:backend}x' -q "Timestamp:Beresp[3] > 3 or Timestamp:Error[3] > 3"
+        std.log("backend: " + beresp.backend.name);
 
-	## Backend down, move to snapshot-server
-	call snapshot-2;
+        ## Let's create a couple helpful tag'ish
+        set beresp.http.x-url = bereq.url;
+        set beresp.http.x-host = bereq.http.host;
 
-	## Set xkey
-	call xkey-3;
+        ## Backend is down: start Snapshot routines 
+
+        # Wordpress is down, let's start snapshot route
+        if (beresp.status == 500) {
+                std.syslog(180, "Backend: error  HTTP 500 – move to vcl_backend_error");
+                return (fail);
+        }
+
+        # One really stranger thing where backend can tell 503, let's start snapshot route
+        if (beresp.status == 503) {
+                std.syslog(180, "Backend: error  HTTP 503 – move to vcl_backend_error");
+                return (fail);
+        }
+
+        # Backend has gateway issue, let's start snapshot route
+        if (beresp.status == 504) {
+                std.syslog(180, "Backend: error  HTTP 504 – move to vcl_backend_error");
+                return (fail);
+        }
+
+        # If backend is down we move to snapshot backend that serves static content, when not in cache.
+        # But Varnish uses 200 OK, because it got content, but we don't want to tell to bots that temp content is 200
+        if (bereq.backend == snapshot && beresp.status == 200) {
+                std.log(">> Snapshot backend responded 200 — rewriting to 302");
+                set beresp.status = 302;
+                set beresp.reason = "Service Unavailable (snapshot)";
+        }
+
+        # If there was an backend error (500/502/503/504) where backend can give a response
+        if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
+
+                # If this was a background fetch (i.e. after grace delivering), abandon
+                if (bereq.is_bgfetch) {
+                        std.syslog(180, "Backend failure, abandoning bgfetch for " + bereq.url);
+                        return(abandon);
+                }
+
+                # Stop cache only if not in snapshot backend
+                if (bereq.backend != snapshot) {
+                        std.syslog(180, "Backend failure, marking response uncacheable: " + bereq.http.host + bereq.url);
+                        set beresp.uncacheable = true;
+                }
+        }
+
+        ## xkey
+	# set tags
+        if (beresp.http.X-Cache-Tags) {
+            set beresp.http.xkey = beresp.http.X-Cache-Tags;
+        }
+
+        # Add domain-xkey if not already there
+        if (bereq.http.host) {
+            if (bereq.http.host == "www.katiska.eu" && !std.strstr(beresp.http.xkey, "domain-katiska")) {
+                set beresp.http.xkey += ",domain-katiska";
+            } else if (bereq.http.host == "www.poochierevival.info" && !std.strstr(beresp.http.xkey, "domain-poochie")) {
+                set beresp.http.xkey += ",domain-poochie";
+            } else if (bereq.http.host == "www.eksis.one" && !std.strstr(beresp.http.xkey, "domain-eksis")) {
+                set beresp.http.xkey += ",domain-eksis";
+            } else if (bereq.http.host == "jagster.eksis.one" && !std.strstr(beresp.http.xkey, "domain-jagster")) {
+                set beresp.http.xkey += ",domain-jagster";
+            } else if (bereq.http.host == "dev.eksis.one" && !std.strstr(beresp.http.xkey, "domain-dev")) {
+                set beresp.http.xkey += ",domain-dev";
+            }
+        }
+
+        # Add xkey for tags if not already there
+        if (bereq.url ~ "^/") {
+            # This trick must be done beacuse strings can't be joined with regex-operator
+            set beresp.http.X-URL-CHECK = "url-" + bereq.url;
+
+            if (!std.strstr(beresp.http.xkey, beresp.http.X-URL-CHECK)) {
+                set beresp.http.xkey += "," + beresp.http.X-URL-CHECK;
+            }
+
+            unset beresp.http.X-URL-CHECK;
+        }
 
 	## TTLs and uncacheables
 	call ttl-4;
 
-	## Vary
-	call vary-5;
+	
+        ## Let' build Vary
+        # first cleaning it, because we don't care what backend wants.
+        unset beresp.http.Vary;
 
-	## Last one, unset something
-	call end-6;
+        # Accept-Encoding could be in Vary, because it changes content
+        # But it is handled internally by Varnish.
+        set beresp.http.Vary = "Accept-Encoding";
+        
+        # User-Agent was sended to backend, but removing it from Vary prevents Varnish to use it for caching
+        # Is this really needed? I removed UA and backend doesn't set it up, but uses what it gets from http.req
+        if (beresp.http.Vary ~ "User-Agent") {
+                set beresp.http.Vary = regsuball(beresp.http.Vary, ",? *User-Agent *", "");
+                set beresp.http.Vary = regsub(beresp.http.Vary, "^, *", "");
+                if (beresp.http.Vary == "") {
+                        unset beresp.http.Vary;
+                }
+        }
 
-# We are at the end
+
+        ## Unset Accept-Language, if backend gave one. I still want to keep it outside cache.
+        unset beresp.http.Accept-Language;
+
+        ## Unset the old pragma header
+        # Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
+        # AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
+        unset beresp.http.Pragma;
+
+# We are at the end of responses
 }
 
 
@@ -561,10 +709,27 @@ sub vcl_backend_response {
 ## Normally this block isn't visible. I'm using it for snapshot_service when backend is down
 sub vcl_backend_error {
 
-	## Backend is down, start snapshot
-	call be_fail;
+    ## There isn't a retry yet, so do it to find out if this is really happening
+    if (bereq.retries == 0) {
+        std.syslog(180, "ALERT: Apache is not responding on first attempt: " + bereq.http.host + bereq.url);
+        std.log("Backend error: first retry");
+        return (retry);
+    }
 
-# We are ready here
+    ## First retry is done and backend is still down. Change to snapshot-server.
+    if (bereq.retries == 1 &&
+        (beresp.status == 500 || beresp.status == 503 || beresp.status == 504)) {
+        std.log("Backend error: switching to snapshot backend");
+        set bereq.backend = snapshot;
+        return (retry);
+    }
+
+    ## Nothing works and now it's time to show error
+    std.syslog(180, "ALERT: snapshot and Apache2 down " + bereq.http.host + bereq.url);
+    std.log("Backend error: all retries failed");
+    return (fail);
+
+# We are ready with errors
 }
 
 
