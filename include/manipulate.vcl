@@ -1,4 +1,4 @@
-sub manipulate-7 {
+sub manipulate {
 
 if (req.http.host ~ "www.katiska.eu") {
 		## URL manipulations, mostly searches(typos, strange spelling etc.)
