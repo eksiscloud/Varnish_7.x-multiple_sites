@@ -28,6 +28,8 @@ import xkey;		# another way to ban
 
 ## Includes are normally in vcl
 
+# vcl_recv
+
 # Block using ASN
 include "/etc/varnish/include/asn_id.vcl";
 include "/etc/varnish/include/generated/asn_blocklist.vcl";
@@ -41,19 +43,18 @@ include "/etc/varnish/include/probes.vcl";
 include "/etc/varnish/include/nice_bots.vcl";
 
 # Kill useless knockers
-include "/etc/varnish/include/recv/6-malicious_url.vcl";
-include "/etc/varnish/include/recv/match_config_attack.vcl";
-include "/etc/varnish/include/recv/match_env_attack.vcl";
-include "/etc/varnish/include/recv/match_other_attack.vcl";
-include "/etc/varnish/include/recv/match_php_attack.vcl";
-include "/etc/varnish/include/recv/match_sql_attack.vcl";
-include "/etc/varnish/include/recv/match_wp_attack.vcl";
+include "/etc/varnish/include/malicious_url.vcl";
+include "/etc/varnish/include/generated/match_config_attack.vcl";
+include "/etc/varnish/include/generated/match_env_attack.vcl";
+include "/etc/varnish/include/generated/match_other_attack.vcl";
+include "/etc/varnish/include/generated/match_php_attack.vcl";
+include "/etc/varnish/include/generated/match_sql_attack.vcl";
+include "/etc/varnish/include/generated/match_wp_attack.vcl";
 
 # Manipulating some urls
-include "/etc/varnish/include/recv/7-manipulate.vcl";
+include "/etc/varnish/include/manipulate.vcl";
 
-# Is there ban or purge, and who can do it
-include "/etc/varnish/include/recv/8-ban_purge.vcl";
+# vcl_backend_response
 
 # vcl_backend_response, part IV - TTL
 include "/etc/varnish/include/backend_response/4-ttl.vcl";
@@ -199,7 +200,7 @@ sub vcl_recv {
 	# There is no one to listening, but those are still hammering backend
 	# acting like low level ddos.
 	# So I waste money and resources to give an error to them
-	call malicious_url-6;
+	call malicious_url;
 
 	## If a user agent isn't identified as user or a bot, its type is unknown.
 	# We must presume it is a visitor. 
@@ -211,12 +212,57 @@ sub vcl_recv {
 		
 	## URL changes, mostly fixed search strings
 	if (req.http.x-bot == "visitor") {
-		call manipulate-7;
+		call manipulate;
 	}
 	
 	## Ban & Purge
 	if (req.method == "BAN" || req.method == "PURGE") {
-		call ban_purge-8;
+    		# Normal no-go rules
+                if (req.http.X-Bypass != "true") {
+                        return(synth(405, "Forbidden"));
+                }
+
+                if (!req.http.xkey-purge) {
+                        return(synth(400, "Missing xkey"));
+                }
+
+    		# Use only allowed xkey-tags
+                if (req.http.xkey-purge !~ "^frontpage$" &&
+                    req.http.xkey-purge !~ "^sidebar$" &&
+                    req.http.xkey-purge !~ "^url-.*" &&
+                    req.http.xkey-purge !~ "^article-[0-9]+$" &&
+                    req.http.xkey-purge !~ "^domain-[a-z0-9-]+$"&&
+                    req.http.xkey-purge !~ "^tag-[a-z0-9-]+$" &&
+                    req.http.xkey-purge !~ "^category-[a-z0-9-]+$"
+                   ) {
+                         std.log("Unknown xkey: " + req.http.xkey-purge);
+                         return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
+                }
+
+    		# When BAN happens
+                if (req.method == "BAN") {
+                        ban("obj.http.xkey ~ " + req.http.xkey-purge);
+                        return(synth(200, "Banned: " + req.http.xkey-purge));
+                }
+
+    		# Using hard PURGE for xkey-urls
+                if (req.method == "PURGE") {
+                        if (req.http.xkey-purge && req.http.xkey-purge ~ "^url-") {
+                                xkey.purge(req.http.xkey-purge);
+                                return(synth(200, "Hard purged: " + req.http.xkey-purge));
+                        }
+                        if (req.http.xkey-purge && req.http.xkey-purge ~ "^domain-") {
+                                xkey.purge(req.http.xkey-purge);
+                                return(synth(200, "Hard purged: " + req.http.xkey-purge));
+                        }
+
+                        # Soft fallback-purge
+                        ban("obj.http.xkey ~ " + req.http.xkey-purge);
+                        return(synth(200, "Soft purged: " + req.http.xkey-purge));
+                }
+
+                # REFRESH or another PURGE
+                return(hash);
 	}
 	
 	## Setup CORS
