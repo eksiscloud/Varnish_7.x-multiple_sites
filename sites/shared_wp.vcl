@@ -4,9 +4,10 @@
 ## Heads up! There is errors for sure
 ## I'm just another copypaster
 ##
-## Varnish 7.7.1 default.vcl for multiple virtual hosts
+## Varnish 7.7.1 default.vcl/shared_wp.vcl for multiple virtual hosts
 ## 
-## default.vcl is splitted in several sub vcls. Those use includes.  That make updating much more easier
+## shared_wp.vcl, same as default.vcl, is splitted in few sub vcls. Those use includes.  
+## That make updating much more easier, because most of my hosts are WordPresses.
 ##
 ## This works as a standalone VCL for one WordPress host too
 ##  
@@ -28,17 +29,16 @@ import xkey;		# another way to ban
 ## Includes are normally in vcl
 
 # Block using ASN
-include "/etc/varnish/include/recv/2-asn_blocklist_start.vcl";
-include "/etc/varnish/include/recv/2-1-asn_id.vcl";
-include "/etc/varnish/include/recv/asn_blocklist.vcl";
+include "/etc/varnish/include/asn_id.vcl";
+include "/etc/varnish/include/generated/asn_blocklist.vcl";
 
 # Pure normalizing and similar, normally done first
-include "/etc/varnish/include/recv/4-normalize.vcl";
+include "/etc/varnish/include/normalize.vcl";
 
 # Cleaning user-agents
-include "/etc/varnish/include/recv/5-1-real_users.vcl";
-include "/etc/varnish/include/recv/5-2-probes.vcl";
-include "/etc/varnish/include/recv/5-3-nice-bot.vcl";
+include "/etc/varnish/include/real_users.vcl";
+include "/etc/varnish/include/probes.vcl";
+include "/etc/varnish/include/nice_bots.vcl";
 
 # Kill useless knockers
 include "/etc/varnish/include/recv/6-malicious_url.vcl";
@@ -149,9 +149,23 @@ sub vcl_recv {
 
 	### The work starts here
 
-	## Forbidden means forbidden
-	# Nginx deals with countries and user-agents, but one is left: ASN
-	call asn_blocklist_start-2;
+	## Nginx deals with countries and user-agents, but one is left: ASN
+        ## If you have just another website for real users maybe It is wise move to ban every single one VPS service
+        ## you don't need for APIs etc.
+        # Heads up: ASN can and quite often will stop more than just one company
+        # Just coming from some ASN doesn't be reason to hard banning,
+        # but everyone here is knocking too often so I'll keep doors closed
+
+        ## ASN can be empty sometimes. Nginx changes it to unknown for easier reading. 
+        # I stop those request, because it is suspicious
+        if (req.http.X-ASN-ID == "unknown") {
+                std.log("Missing ASN-ID: " + req.http.X-Real-IP + " " + req.http.Country-Code);
+                return(synth(400, "Missing ASN-ID"));
+        }
+
+        # Let`s filtering
+        call asn_id;
+        call asn_blocklist;
 
         ## Tidying a little bit places before the work starts.
         # Reset hit/miss counter
@@ -160,25 +174,25 @@ sub vcl_recv {
         # Just to on safe side, if there is i.e. return(pass/restart) that comes from a situation that can mess things
         unset req.http.X-Saved-Origin;
 
-	## Normalizing, part 1
-	call normalize-4;
+	## Normalizing, as hosts, https, country-code etc.
+	call normalize;
 
         ## Central station for tidying user-agents.
         ## I could normalize UA, but nowadays I leave is as it is, and adding two x-headers:
         ## x-bot and x-user-agent
 
         # These should be marked as real users, but some aren't
-        call real_users-5-1;
+        call real_users;
 
         # Technical probes
         # These are useful and I want to know if backend is working etc.
         if (req.http.x-bot != "visitor") {
-                call probes-5-2;
+                call probes;
         }
 
         # These are nice bots, and I'm normalizing UA a bit
         if (req.http.x-bot !~ "(visitor|tech)$") {
-                call nice-bots-5-3;
+                call nice_bots;
         }
 		
 	## Huge list of urls and pages that are constantly knocked
