@@ -12,7 +12,7 @@ cmd = [
     "-g", "request",
     "-q", 'VCL_Log ~ "BOT_DETECTED"',
     "-n", "varnishd",  # change if/when different workdir
-    "-d", "-t", "1800"   # Collecting 60 seconds
+    "-d", "-t", "1800"   # Collecting this many seconds
 ]
 
 print("Analyzing BOT_DETECTED-requests...")
@@ -25,9 +25,9 @@ ips = ip_pattern.findall(proc.stdout)
 
 counter = Counter(ips)
 
-# Show resutls and suggest banning
+# Show results and suggest banning
 for ip, count in counter.items():
     if count >= 3:
         print(f"🚨 IP {ip} detected {count} times inside udes timeframe. Perhaps it should be banned.")
     else:
-        print(f"IP {ip} detected {count} kertaa — no need to react.")
+        print(f"IP {ip} detected {count} times — no need to react.")
