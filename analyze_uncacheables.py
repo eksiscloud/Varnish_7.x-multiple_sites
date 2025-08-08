@@ -57,7 +57,7 @@ for url, block in uncacheable_entries:
         elif "beresp.uncacheable = true" in line:
             reason.append("uncacheable")
 
-    final_reason = ", ".join(sorted(set(reason))) if reason else "unkown"
+    final_reason = ", ".join(sorted(set(reason))) if reason else "unknown"
     reason_summary[final_reason] += 1
     reason_by_url[url].append(final_reason)
 
