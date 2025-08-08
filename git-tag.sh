@@ -26,11 +26,11 @@ read -p "Give short description: " tagdesc
 git tag -a "$tagname" -m "$tagdesc"
 echo "✅ Tag '$tagname' created."
 
-# Kysytään lähetetäänkö GitHubiin
-read -p "Haluatko lähettää tagin GitHubiin? (y/n) " pushit
+# Shall it send to GitHub
+read -p "Do you want to send the tag to GitHub? (y/n) " pushit
 if [[ "$pushit" == "y" ]]; then
   git push origin "$tagname"
-  echo "📡 Tagi lähetetty GitHubiin."
+  echo "📡 The tag is sended to GitHub."
 else
-  echo "🚫 Tagi jäi paikalliseksi."
+  echo "🚫 The tag stays local."
 fi
