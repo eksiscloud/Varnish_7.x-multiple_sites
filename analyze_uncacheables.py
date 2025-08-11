@@ -10,7 +10,7 @@ from collections import defaultdict
 # ./analyze_uncacheables.py < /tmp/varnishlog.txt
 uncacheable_entries = []
 current_url = None
-current_block = []
+xcurrent_block = []
 inside_request = False
 
 for line in sys.stdin:
@@ -50,9 +50,9 @@ for url, block in uncacheable_entries:
             reason.append("Set-Cookie")
         elif "Cache-Control" in line and "no-store" in line:
             reason.append("Cache-Control: no-store")
-        elif "return(pass)" in line:
+        elif "PASS" in line:
             reason.append("return(pass)")
-        elif "return(pipe)" in line:
+        elif "PIPE" in line:
             reason.append("return(pipe)")
         elif "beresp.uncacheable = true" in line:
             reason.append("uncacheable")
