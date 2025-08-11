@@ -235,6 +235,8 @@ sub bad_bot_detection {
 		|| req.http.User-Agent ~ "Mb2345Browser"				# bad
 		|| req.http.User-Agent ~ "MegaIndex.ru"
 		|| req.http.User-Agent ~ "Mercator"
+		|| req.http.User-Agent ~ "meta-externalads"
+                || req.http.User-Agent ~ "meta-externagent"
 		|| req.http.User-Agent ~ "MixerBox"
 		|| req.http.User-Agent ~ "MixnodeCache"
 		|| req.http.User-Agent ~ "MJ12bot"						# good
