@@ -6,7 +6,7 @@ timestamp=$(date +"%Y%m%d_%H%M%S")
 # Common VCL
 vclfile="/etc/varnish/sites/shared_wp.vcl"
 
-# Sites using shared_wp.vcl:ää
+# Sites using shared_wp.vcl
 sites=(
   "katiska"
   "poochie"
@@ -16,27 +16,60 @@ sites=(
   "dev"
 )
 
-# Ensin tarkistetaan syntaksi
-echo "🔍 Check VCL-syntax: $vclfile"
+# CLI connection params
+VARNISHADM="varnishadm -T localhost:6082 -S /etc/varnish/secret -t 30"
 
+# Function to run varnishadm with retry on CLI communication error (hdr)
+run_varnishadm() {
+    local cmd="$1"
+    local attempts=0
+    local max_attempts=2
+
+    while (( attempts < max_attempts )); do
+        output=$($VARNISHADM $cmd 2>&1)
+        if echo "$output" | grep -q "CLI communication error (hdr)"; then
+            ((attempts++))
+            if (( attempts < max_attempts )); then
+                echo "⚠ CLI error (hdr), retrying in 0.5s..."
+                sleep 0.5
+                continue
+            else
+                echo "❌ ERROR after $max_attempts attempts: $cmd"
+                return 1
+            fi
+        fi
+        echo "$output"
+        return 0
+    done
+}
+
+echo "🔍 Checking VCL syntax: $vclfile"
 if ! varnishd -Cf "$vclfile" > /dev/null 2>&1; then
-    echo "❌ ERROR: A syntax error in VCL. Deploy cancelled."
+    echo "❌ ERROR: Syntax error in VCL. Deploy cancelled."
     exit 1
 fi
+echo "✅ Syntax OK"
 
-echo "✅ Syntax OK. Continuing deploy..."
-echo
+# Pieni tauko ennen latauksia
+sleep 0.2
 
-# Load and label for every site
+# Loop through sites
 for site in "${sites[@]}"; do
     vclname="${site}_${timestamp}"
-    echo -e "==> Update $site → $vclname"
-    sleep 5
-    varnishadm vcl.load "$vclname" "$vclfile"
-    echo -e "==> Load $vclname → $vclfile"
-    sleep 5
-    varnishadm vcl.label "$site" "$vclname"
-    echo -e "✓ Label has set: $site → $vclname"
+    echo
+    echo "==> Load for $site → $vclname"
+
+    if ! run_varnishadm "vcl.load $vclname $vclfile"; then
+        continue
+    fi
+
+    sleep 0.1
+
+    if ! run_varnishadm "vcl.label $site $vclname"; then
+        continue
+    fi
+
+    echo "✓ Label set: $site → $vclname"
 done
 
 echo "✅ All is ready. Checkout the status: varnishadm vcl.list"
