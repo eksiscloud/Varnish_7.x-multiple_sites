@@ -50,7 +50,7 @@ if ! varnishd -Cf "$vclfile" > /dev/null 2>&1; then
 fi
 echo "✅ Syntax OK"
 
-# Pieni tauko ennen latauksia
+# Small pause before loads
 sleep 0.2
 
 # Loop through sites
