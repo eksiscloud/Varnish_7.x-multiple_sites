@@ -231,6 +231,7 @@ sub vcl_recv {
 
     		# When BAN happens
                 if (req.method == "BAN") {
+			std.syslog(150, "BAN_TAG host=" + req.http.host + " tag=" + req.http.xkey-purge);
                         ban("obj.http.xkey ~ " + req.http.xkey-purge);
                         return(synth(200, "Banned: " + req.http.xkey-purge));
                 }
