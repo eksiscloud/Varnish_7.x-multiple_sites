@@ -47,11 +47,20 @@ sub nice_bots {
 		}
 		
 	if (
-                # DuckDuckGo
+                # Mastodon
                 req.http.User-Agent ~ "Mastodon"
                 ) {
                         set req.http.x-bot = "nice";
                         set req.http.User-Agent = "Mastodon";
+                        set req.http.x-user-agent = req.http.User-Agent;
+                }
+
+	if (
+                # Qwant
+                req.http.User-Agent ~ "Qwantbot"
+                ) { 
+                        set req.http.x-bot = "nice";
+                        set req.http.User-Agent = "Qwant";
                         set req.http.x-user-agent = req.http.User-Agent;
                 }
 
