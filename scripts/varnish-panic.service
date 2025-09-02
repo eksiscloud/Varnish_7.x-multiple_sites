@@ -1,0 +1,19 @@
+[Unit]
+Description=Varnish PANIC instance (emergency mode on :8081)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/varnish-panic.sh
+# before starting the panic, raise the flag
+ExecStartPre=/bin/bash -lc 'touch /run/emergency_on;'
+# when the panic is over, remove the flag
+ExecStopPost=/bin/bash -lc 'rm -f /run/emergency_on;'
+Restart=on-failure
+RestartSec=2s
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
