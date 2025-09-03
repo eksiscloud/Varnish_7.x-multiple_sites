@@ -1,6 +1,0 @@
-[Unit]
-Description=Varnish healthcheck and switchover
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/varnish-switchover.sh
