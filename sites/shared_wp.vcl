@@ -356,15 +356,31 @@ sub vcl_recv {
         }
 
         ## WordPress REST API
-        if (req.url ~ "^/wp-json/wp/") {
-            if (req.http.Authorization) {
-                return (pass);
-            }
-            if (req.http.Cookie ~ "wordpress_logged_in") {
-                return (pass);
-            }
-            return (synth(403, "Unauthorized request"));
+    if (req.url ~ "^/wp-json/wp/") {
+
+        if (req.http.Authorization) {
+            return (pass);
         }
+
+        if (req.http.Cookie ~ "wordpress_logged_in") {
+            return (pass);
+        }
+
+        # quick debug, syslog will broadcast?
+        #std.syslog(160, "REST recv: X-Bypass=" + req.http.X-Bypass + " XFF=" + req.http.X-Forwarded-For);
+
+        # map value of accepted IPs by Nginx, acl if you like
+        if (req.http.X-Bypass == "true") {
+            return (pass);
+        }
+
+	# Safenet for searxng
+        if (req.http.X-Real-IP == "172.18.0.3") {
+            return (pass);
+        }
+
+        return (synth(403, "Unauthorized request"));
+    }
 
         ## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
@@ -1115,7 +1131,8 @@ sub vcl_deliver {
         set resp.http.Your-Agent = req.http.User-Agent;
         set resp.http.Your-IP = req.http.X-Real-IP;
         #set resp.http.Your-Language = req.http.Accept-Language;
-
+	set resp.http.Absolutely = req.http.X-Bypass;
+	
 	## Don't show funny stuff to bots
 	if (req.http.x-bot == "visitor") {
 		# lookup can't be in sub vcl
