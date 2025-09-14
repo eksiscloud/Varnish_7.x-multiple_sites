@@ -356,31 +356,38 @@ sub vcl_recv {
         }
 
         ## WordPress REST API
-    if (req.url ~ "^/wp-json/wp/") {
+        if (req.url ~ "^/wp-json/wp/") {
+            if (req.http.Authorization||
+                req.http.Cookie ~ "wordpress_logged_in" ||
+                # acl from Nginx
+                req.http.X-Bypass == "true" ||
+                # Safenet for searxng
+                req.http.X-Real-IP == "172.18.0.3"
+             ) {
 
-        if (req.http.Authorization) {
-            return (pass);
+                # WP REST API doesn't allow POST and gives 403, but SearXNG might use it
+                # 403 isn't an option, because SearXNG creates 24h soft ban
+                # Let's give an empty JSON instead
+                if (req.method == "POST" &&
+                    req.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
+                    req.url ~ "(\\?|&)search=") 
+                    {
+                    return (synth(750, "EmptyJSON"));
+                }
+                
+                # short cache for searxng when GET
+                if (req.url ~ "[?&]search=") {
+                    # quick debug, syslog will broadcast!
+                    #std.syslog(160, "REST recv: X-Bypass=" + req.http.X-Bypass + " XFF=" + req.http.X-Forwarded-For);
+                    return (hash);
+                }
+
+                # everything else will pass
+                return (pass);   
+            }
+            # others: go away
+            return (synth(403, "Unauthorized request"));
         }
-
-        if (req.http.Cookie ~ "wordpress_logged_in") {
-            return (pass);
-        }
-
-        # quick debug, syslog will broadcast?
-        #std.syslog(160, "REST recv: X-Bypass=" + req.http.X-Bypass + " XFF=" + req.http.X-Forwarded-For);
-
-        # map value of accepted IPs by Nginx, acl if you like
-        if (req.http.X-Bypass == "true") {
-            return (pass);
-        }
-
-	# Safenet for searxng
-        if (req.http.X-Real-IP == "172.18.0.3") {
-            return (pass);
-        }
-
-        return (synth(403, "Unauthorized request"));
-    }
 
         ## Normalize the query arguments.
         # I'm excluding admin, because otherwise it will cause issues.
@@ -713,6 +720,16 @@ sub vcl_backend_response {
                         return(deliver);
         }
         
+        ## Short cache for SearXNG API-calls with GET
+        if (bereq.method == "GET" && 
+            bereq.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
+            bereq.url ~ "(\\?|&)search=") {
+		unset beresp.http.Cache-Control;
+                set beresp.ttl = 30s;
+		set beresp.uncacheable = false;
+                return(deliver);
+        }
+
         ## Conditional 410 for urls that may do come back
         if (beresp.status == 404 &&  (
                 bereq.url ~ "/wp-content/cache/" || # old WP Rocket cachefiles, that Bing can't handle
@@ -1332,6 +1349,23 @@ sub vcl_synth {
                 set resp.reason = "Moved";
                 return (deliver);
         }
+
+        # 760 -> 404 with empty JSON for SearXNG
+        if (resp.status == 7600 && resp.reason == "EmptyJSON") {
+                set resp.status = 200;
+                set resp.reason = "OK";
+                set resp.http.Content-Type = "application/json; charset=utf-8";
+
+                # Emulated WP-headers for "no hits" -cases:
+                set resp.http.X-WP-Total = "0";
+                set resp.http.X-WP-TotalPages = "0";
+                set resp.http.Access-Control-Expose-Headers = "X-WP-Total, X-WP-TotalPages";
+
+                # There is no point to cache this
+                set resp.http.Cache-Control = "no-store, max-age=0";
+                synthetic("[]");
+                return (deliver);
+       }
 
        ## 410 Gone
         if (resp.status == 810) {
