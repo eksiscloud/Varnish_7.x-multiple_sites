@@ -365,16 +365,6 @@ sub vcl_recv {
                 req.http.X-Real-IP == "172.18.0.3"
              ) {
 
-                # WP REST API doesn't allow POST and gives 403, but SearXNG might use it
-                # 403 isn't an option, because SearXNG creates 24h soft ban
-                # Let's give an empty JSON instead
-                if (req.method == "POST" &&
-                    req.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
-                    req.url ~ "(\\?|&)search=") 
-                    {
-                    return (synth(750, "EmptyJSON"));
-                }
-                
                 # short cache for searxng when GET
                 if (req.url ~ "[?&]search=") {
                     # quick debug, syslog will broadcast!
@@ -721,12 +711,10 @@ sub vcl_backend_response {
         }
         
         ## Short cache for SearXNG API-calls with GET
-        if (bereq.method == "GET" && 
-            bereq.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
+        if (bereq.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
             bereq.url ~ "(\\?|&)search=") {
 		unset beresp.http.Cache-Control;
                 set beresp.ttl = 30s;
-		set beresp.uncacheable = false;
                 return(deliver);
         }
 
@@ -1349,23 +1337,6 @@ sub vcl_synth {
                 set resp.reason = "Moved";
                 return (deliver);
         }
-
-        # 760 -> 404 with empty JSON for SearXNG
-        if (resp.status == 7600 && resp.reason == "EmptyJSON") {
-                set resp.status = 200;
-                set resp.reason = "OK";
-                set resp.http.Content-Type = "application/json; charset=utf-8";
-
-                # Emulated WP-headers for "no hits" -cases:
-                set resp.http.X-WP-Total = "0";
-                set resp.http.X-WP-TotalPages = "0";
-                set resp.http.Access-Control-Expose-Headers = "X-WP-Total, X-WP-TotalPages";
-
-                # There is no point to cache this
-                set resp.http.Cache-Control = "no-store, max-age=0";
-                synthetic("[]");
-                return (deliver);
-       }
 
        ## 410 Gone
         if (resp.status == 810) {
