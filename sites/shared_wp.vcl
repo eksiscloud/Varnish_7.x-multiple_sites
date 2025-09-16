@@ -710,9 +710,10 @@ sub vcl_backend_response {
                         return(deliver);
         }
         
-        ## Short cache for SearXNG API-calls with GET
-        if (bereq.url ~ "^/wp-json/wp/v2/(posts|pages)(/|\\?|$)" &&
+        ## Short cache for SearXNG API-calls with GET. Add after posts|pages needed CPT-slugs, if in use (with Relevanssi)
+        if (bereq.url ~ "^/wp-json/wp/v2/(posts|pages|knowledge|podcasts)(/|\\?|$)" &&
             bereq.url ~ "(\\?|&)search=") {
+                set beresp.uncacheable = false;
 		unset beresp.http.Cache-Control;
                 set beresp.ttl = 30s;
                 return(deliver);
