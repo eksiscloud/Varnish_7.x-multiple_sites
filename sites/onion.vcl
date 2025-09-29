@@ -25,7 +25,7 @@ vcl 4.1;
 
 backend wp {
   .host = "127.0.0.1";
-  .port = "8081";
+  .port = "8282";
   .first_byte_timeout = 60s;
   .between_bytes_timeout = 30s;
 }
@@ -41,7 +41,7 @@ sub vcl_recv {
   # ONION-branch
   if (req.http.host ~ "(?i)rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid\\.onion$") {
     # Proxy right proto  + do not chain IP`ish of Tor
-    remove req.http.X-Forwarded-For;
+    unset req.http.X-Forwarded-For;
     set req.http.X-Forwarded-For = "127.0.0.1";
     set req.http.X-Forwarded-Proto = "http";
 
@@ -60,15 +60,6 @@ sub vcl_recv {
   return (hash);
 }
 
-#### vcl_synth ####
-#
-sub vcl_synth {
-  if (resp.status == 302 && req.http.X-Redirect-Target) {
-    set resp.http.Location = req.http.X-Redirect-Target;
-    set resp.http.Cache-Control = "no-store";
-  }
-  return (deliver);
-}
 
 #### vcl_backend_response ####
 #
@@ -96,12 +87,24 @@ sub vcl_backend_response {
 
     # Fix TTLs later, now short one
     if (beresp.ttl <= 0s) { set beresp.ttl = 30m; }
-
+  }
+ 
   # These urls aren't allowed here. Must clean this at some point.
   if (beresp.http.Set-Cookie && bereq.url !~ "(?i)(wp-login\\.php|wp-admin|/cart|/checkout)") {
     unset beresp.http.Set-Cookie;
   }
 
+  return (deliver);
+}
+
+
+#### vcl_synth ####
+#
+sub vcl_synth {
+  if (resp.status == 302 && req.http.X-Redirect-Target) {
+    set resp.http.Location = req.http.X-Redirect-Target;
+    set resp.http.Cache-Control = "no-store";
+  }
   return (deliver);
 }
 
@@ -112,6 +115,6 @@ sub vcl_deliver {
   if (req.http.host ~ "(?i)rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid\\.onion$") {
     set resp.http.X-Onion = "1";
   } else {
-    remove resp.http.X-Onion;
+    unset resp.http.X-Onion;
   }
 }
