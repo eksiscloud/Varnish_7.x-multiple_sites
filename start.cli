@@ -1,3 +1,4 @@
+vcl.load onion-eksis-1 /etc/varnish/sites/onion.vcl
 vcl.load poochie-1 /etc/varnish/sites/shared_wp.vcl
 vcl.load matomo-1 /etc/varnish/sites/matomo.vcl
 vcl.load dev-1 /etc/varnish/sites/shared_wp.vcl
@@ -6,6 +7,7 @@ vcl.load eksis-1 /etc/varnish/sites/shared_wp.vcl
 vcl.load selko-1 /etc/varnish/sites/shared_wp.vcl
 vcl.load store-1 /etc/varnish/sites/store.katiska.vcl
 vcl.load katiska-1 /etc/varnish/sites/shared_wp.vcl
+vcl.label onion-eksis onion-eksis-1
 vcl.label poochie poochie-1
 vcl.label matomo matomo-1
 vcl.label dev dev-1

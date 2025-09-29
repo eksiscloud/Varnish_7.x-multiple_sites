@@ -73,6 +73,11 @@ sub vcl_recv {
                 return(vcl(matomo));
 	}	
 
+        # www.eksis.one
+        if (req.http.host == rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion") {
+                return(vcl(onion));
+        }
+
 	return (synth(404));
 	
 ## End of this road
