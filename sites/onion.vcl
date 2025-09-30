@@ -283,6 +283,12 @@ sub vcl_backend_response {
                 set beresp.http.X-Cache-Control = "pass: streamed audio";
         }
 
+	## Missing one can be found
+	if (beresp.status == 404) {
+		set beresp.ttl = 120s;
+		set beresp.uncacheable = true;
+	}
+
 	## Error 410 are steady and lives forever
         if (beresp.status == 410) {
                 unset beresp.http.Set-Cookie;
