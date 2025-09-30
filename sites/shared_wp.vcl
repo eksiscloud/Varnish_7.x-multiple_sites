@@ -572,6 +572,14 @@ sub vcl_backend_response {
         set beresp.http.x-url = bereq.url;
         set beresp.http.x-host = bereq.http.host;
 
+	## Do not cache redirects (onion debugging)
+        #if (beresp.status == 301 || beresp.status == 302 || beresp.status == 303
+        #    || beresp.status == 307 || beresp.status == 308) {
+	#	set beresp.ttl = 0s;
+        #        set beresp.uncacheable = true;
+        #        return (deliver);
+        #}
+
         ## Backend is down: start Snapshot routines 
 
         # Wordpress is down, let's start snapshot route

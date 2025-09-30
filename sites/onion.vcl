@@ -38,25 +38,27 @@ sub vcl_recv {
     return (pass);
   }
 
-  # ONION-branch
+  # rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion
   if (req.http.host ~ "(?i)rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid\\.onion$") {
-    # Proxy right proto  + do not chain IP`ish of Tor
+    set req.http.X-From-Onion = "1";
+    set req.http.X-Forwarded-Proto = "http";
     unset req.http.X-Forwarded-For;
     set req.http.X-Forwarded-For = "127.0.0.1";
-    set req.http.X-Forwarded-Proto = "http";
+
+    # Must do for Apache2/WordPress
+#    set req.http.host = "www.eksis.one";
 
     # Send cookie/POST/admin to clearnet
-    if (req.http.Cookie
-        || req.url ~ "(?i)(wp-login\\.php|wp-admin|/admin|/account|/signin|/checkout|/cart)"
-        || req.method == "POST") {
-      set req.http.X-Redirect-Target = "https://www.eksis.one" + req.url;
-      return (synth(302, "Redirect to clearnet"));
-    }
-  } else {
+#    if (req.http.Cookie
+#        || req.url ~ "(?i)(wp-login\\.php|wp-admin|/admin|/account|/signin|/checkout|/cart)"
+#        || req.method == "POST") {
+#      set req.http.X-Redirect-Target = "https://www.eksis.one" + req.url;
+#      return (synth(302, "Redirect to clearnet"));
+#    }
+#  } else {
     # CLEARNET: be sure about proto, because Varnish is behind TLS-terminating
-    if (!req.http.X-Forwarded-Proto) { set req.http.X-Forwarded-Proto = "https"; }
+#    if (!req.http.X-Forwarded-Proto) { set req.http.X-Forwarded-Proto = "https"; }
   }
-
   return (hash);
 }
 
@@ -65,17 +67,17 @@ sub vcl_recv {
 #
 sub vcl_backend_response {
   # There is no HSTS or Secure-flags in onion
-  if (bereq.http.host ~ "(?i)rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid\\.onion$") {
+  if (bereq.http.host ~ "rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion") {
     unset beresp.http.Strict-Transport-Security;
 
     # if a backend tries redirect to clearnet, keep onion
-    if (beresp.status == 301 || beresp.status == 302 || beresp.status == 303
-        || beresp.status == 307 || beresp.status == 308) {
-      if (beresp.http.Location) {
-        set beresp.http.Location = regsub(beresp.http.Location,
-          "(?i)^https?://(www\\.)?eksis\\.one", "http://rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion");
-      }
-    }
+#    if (beresp.status == 301 || beresp.status == 302 || beresp.status == 303
+#        || beresp.status == 307 || beresp.status == 308) {
+#      if (beresp.http.Location) {
+#        set beresp.http.Location = regsub(beresp.http.Location,
+#          "(?i)^https?://(www\\.)?eksis\\.one", "http://rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion");
+#      }
+#    }
 
     # Do not allow cookies from a backend
     if (beresp.http.Set-Cookie) { 
@@ -90,9 +92,9 @@ sub vcl_backend_response {
   }
  
   # These urls aren't allowed here. Must clean this at some point.
-  if (beresp.http.Set-Cookie && bereq.url !~ "(?i)(wp-login\\.php|wp-admin|/cart|/checkout)") {
-    unset beresp.http.Set-Cookie;
-  }
+#  if (beresp.http.Set-Cookie && bereq.url !~ "(?i)(wp-login\\.php|wp-admin|/cart|/checkout)") {
+#    unset beresp.http.Set-Cookie;
+#  }
 
   return (deliver);
 }
