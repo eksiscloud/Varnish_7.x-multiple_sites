@@ -73,9 +73,20 @@ sub vcl_recv {
                 return(vcl(matomo));
 	}	
 
-        # www.eksis.one
-        if (req.http.host == "rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion") {
+        if (req.http.host == "rfuwrkgfnbdb57mdk7p3gvwehcrzewoqojramfhux7fal7l7bhvxzkqd.onion") {
                 return(vcl(onion-eksis));
+        }
+
+        if (req.http.host == "m7exyvudxph6a4ooxyips6ujx6dhyoxa6e5kb7xo76nzrapubndka2id.onion") {
+                return(vcl(onion-jagster));
+        }
+
+        if (req.http.host == "tf4yktl7spk5xdaon67b7zpa3jffzba2g2xu5l3k5ipeg5rdzq2wqhad.onion") {
+                return(vcl(onion-katiska));
+        }
+
+        if (req.http.host == "pdb77kdgubijdocwbizyhi7iawcr3vnwsdiv5kwabua2rgvy2b7py2yd.onion") {
+                return(vcl(onion-poochie));
         }
 
 	return (synth(404));

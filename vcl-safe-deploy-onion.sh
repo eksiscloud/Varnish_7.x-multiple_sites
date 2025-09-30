@@ -8,7 +8,10 @@ vclfile="/etc/varnish/sites/onion.vcl"
 
 # Sites using onion.vcl
 sites=(
-  "eksis-onion"
+  "onion-eksis"
+  "onion-jagster"
+  "onion-katiska"
+  "onion-poochie"
 )
 
 # CLI connection params

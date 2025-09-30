@@ -957,6 +957,28 @@ sub vcl_backend_response {
         ## Unset Accept-Language, if backend gave one. I still want to keep it outside cache.
         unset beresp.http.Accept-Language;
 
+        ## Show Onion-Location
+        if (bereq.method == "GET" && beresp.status == 200 &&
+            beresp.http.Content-Type ~ "(?i)text/html" &&
+            bereq.url !~ "(?i)wp-admin|wp-login\.php|/cart|/checkout|/account") {
+            if (bereq.http.host ~ "(?i)^www\.eksis\.one$") {
+                set beresp.http.Onion-Location =
+                "http://rfuwrkgfnbdb57mdk7p3gvwehcrzewoqojramfhux7fal7l7bhvxzkqd.onion" + bereq.url;
+            }
+            if (bereq.http.host ~ "(?i)^jagster\.eksis\.one$") {
+                set beresp.http.Onion-Location = 
+                "http://m7exyvudxph6a4ooxyips6ujx6dhyoxa6e5kb7xo76nzrapubndka2id.onion" + bereq.url;
+            }
+            if (bereq.http.host ~ "(?i)^www\.katiska\.eu$") {
+                set beresp.http.Onion-Location = 
+                "http://tf4yktl7spk5xdaon67b7zpa3jffzba2g2xu5l3k5ipeg5rdzq2wqhad.onion" + bereq.url;
+            }
+            if (bereq.http.host ~ "(?i)^www\.poochierevival\.info$") {
+                set beresp.http.Onion-Location = 
+                "http://pdb77kdgubijdocwbizyhi7iawcr3vnwsdiv5kwabua2rgvy2b7py2yd.onion" + bereq.url;
+            } 
+        }
+
         ## Unset the old pragma header
         # Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
         # AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
