@@ -74,8 +74,8 @@ sub vcl_recv {
 	}	
 
         # www.eksis.one
-        if (req.http.host == rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion") {
-                return(vcl(onion));
+        if (req.http.host == "rqqkvluwdb2hiqgu2mrnlby5o3s4o35kwelgmuh6y7lzj2bkpej3jxid.onion") {
+                return(vcl(onion-eksis));
         }
 
 	return (synth(404));
