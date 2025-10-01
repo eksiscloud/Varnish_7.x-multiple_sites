@@ -22,9 +22,14 @@
 # Marker to tell the VCL compiler that this VCL has been adapted to the 4.1 format.
 vcl 4.1;
 
-# native ones
+# Native ones
 import std;             # Load the std, not STD for god sake
+import purge;           # Soft/hard purge by Varnish 7.x
 
+# From combiled varnish-modules
+import xkey;            # another way to ban
+
+# Used backend
 backend onion {
         .host = "127.0.0.1";
         .port = "8282";
@@ -502,7 +507,7 @@ sub vcl_deliver {
         unset resp.http.X-dlm-no-waypoints;
         unset resp.http.X-UA-Compatible;
 	unset resp.http.X-Cache-Tags;
-	unset resp.http.Expires
+	unset resp.http.Expires;
 
         ## Vary to browser
         set resp.http.Vary = "Accept-Encoding";
