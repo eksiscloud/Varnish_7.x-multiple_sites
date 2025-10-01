@@ -83,14 +83,121 @@ sub vcl_recv {
         unset req.http.X-Forwarded-For;
         set req.http.X-Forwarded-For = "127.0.0.1";
 
-	## Cache needs ban, purge and xkey
-	# coming...
+        ## Short grace, because I'm using long TTLs
+	set req.grace = 30s;
+
+        ## Only deal with "normal" types
+        # In-build rules. Those aren't needed, unless return(...) forces skip it.
+        # Heads up! BAN/PURGE/REFRESH must be done before this or declared here. Unless those don't work when purging or banning.
+        # Heads up! If you are filtering methods in Nginx/Apache2 allow same ones there too
+        if (req.method != "GET" &&
+        req.method != "HEAD" &&
+        req.method != "PUT" &&
+        req.method != "POST" &&
+        req.method != "TRACE" &&
+        req.method != "OPTIONS" &&
+        req.method != "PATCH" &&
+        req.method != "DELETE" &&
+        req.method != "PURGE" &&
+	req.method != "BAN"
+        ) {
+        # Non-RFC2616 or CONNECT which is weird.
+        # Why send the packet upstream, while the visitor is using a non-valid HTTP method?
+                return(synth(405, "Non-valid HTTP method!"));
+        }
+
+	## Remove known following parameters, useless for backend
+	# Analytics: utm_*, gclid, fbclid, msclkid, ga_source
+	# Marketing: mc_cid, mc_eid, trk, elqTrackId
+	# Social: fb_source, shared, msg, ref, igshid
+	# WordPress related: tmstv, siteurl, cx, cof, ie
+	# Hubspot: _hsenc, _hsmi
+	set req.url = regsuball(req.url, "&(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|msclkid|dclid|yclid|mc_cid|mc_eid|cx|ie|cof|siteurl|ref|igshid|fb_source|trk|elqTrackId|tmstv|shared|msg|_hsenc|_hsmi|ga_source)=[^&]*", "");
+	set req.url = regsuball(req.url, "\?(utm_source|utm_medium|utm_campaign|utm_content|utm_term|gclid|fbclid|msclkid|dclid|yclid|mc_cid|mc_eid|cx|ie|cof|siteurl|ref|igshid|fb_source|trk|elqTrackId|tmstv|shared|msg|_hsenc|_hsmi|ga_source)=[^&]*", "?");
+	set req.url = regsub(req.url, "\?&", "?");
+	set req.url = regsub(req.url, "\?$", "");
+
+        ## Save Origin (for CORS) in a custom header and remove Origin from the request 
+        # so that backend doesn’t add CORS headers.
+        set req.http.X-Saved-Origin = req.http.Origin;
+        unset req.http.Origin;
+
+	## Cleaning User-Agent. We really don't want it in the cache
+	set req.http.x-agent = req.http.User-Agent;
+        unset req.http.User-Agent;
+
+        ## I'm cleaning language. I don't have multilangual sites.
+        # For REAL normalizing you should work with Accept-Language only
+        # Now I just remove lang.
+        unset req.http.Accept-Language;
+
+	## Ban & Purge
+	if (req.method == "BAN" || req.method == "PURGE") {
+    		# Normal no-go rules
+                if (req.http.X-Bypass != "true") {
+                        return(synth(405, "Forbidden"));
+                }
+
+                if (!req.http.xkey-purge) {
+                        return(synth(400, "Missing xkey"));
+                }
+
+    		# Use only allowed xkey-tags
+                if (req.http.xkey-purge !~ "^frontpage$" &&
+                    req.http.xkey-purge !~ "^sidebar$" &&
+                    req.http.xkey-purge !~ "^url-.*" &&
+                    req.http.xkey-purge !~ "^article-[0-9]+$" &&
+                    req.http.xkey-purge !~ "^domain-[a-z0-9-]+$"&&
+                    req.http.xkey-purge !~ "^tag-[a-z0-9-]+$" &&
+                    req.http.xkey-purge !~ "^category-[a-z0-9-]+$"
+                   ) {
+                         std.log("Unknown xkey: " + req.http.xkey-purge);
+                         return(synth(404, "Unknown xkey tag: " + req.http.xkey-purge));
+                }
+
+    		# When BAN happens
+                if (req.method == "BAN") {
+			std.syslog(150, "BAN_TAG host=" + req.http.host + " tag=" + req.http.xkey-purge);
+                        ban("obj.http.xkey ~ " + req.http.xkey-purge);
+                        return(synth(200, "Banned: " + req.http.xkey-purge));
+                }
+
+    		# Using hard PURGE for xkey-urls
+                if (req.method == "PURGE") {
+                        if (req.http.xkey-purge && req.http.xkey-purge ~ "^url-") {
+                                xkey.purge(req.http.xkey-purge);
+                                return(synth(200, "Hard purged: " + req.http.xkey-purge));
+                        }
+                        if (req.http.xkey-purge && req.http.xkey-purge ~ "^domain-") {
+                                xkey.purge(req.http.xkey-purge);
+                                return(synth(200, "Hard purged: " + req.http.xkey-purge));
+                        }
+
+                        # Soft fallback-purge
+                        ban("obj.http.xkey ~ " + req.http.xkey-purge);
+                        return(synth(200, "Soft purged: " + req.http.xkey-purge));
+                }
+
+                # REFRESH or another PURGE
+                return(hash);
+	}
 
 	## CORS is needed in the onion world, I reckon
-	# coming
+	# Incoming requests
+        if (req.http.Origin) {
+                std.log("CORS check: incoming request with Origin: " + req.http.Origin + " → URL: " + req.url);
+
+        # Whitelist allowed origins using regular expression
+        if (req.http.X-Pseudo) {
+                set req.http.X-Saved-Origin = req.http.Origin;
+                std.log("CORS accepted: " + req.http.Origin);
+        } else {
+                std.log("CORS denied: " + req.http.Origin);
+                }
+        }
 
 	## Only GET, HEAD and static'ish urls may continue
-	# Everything else redirect back to light in the clearnet
+	# Everything else redirect back to the light of the clearnet
 	if ( (req.method != "GET" && req.method != "HEAD")
 	     || req.url ~ "(?i)^/wp-(login|admin|cron)|login|my-account|signin(/|\\?|$)"  
 	     || req.url ~ "^/wp-json/wp/"
@@ -111,10 +218,10 @@ sub vcl_recv {
                 return (synth(301, "Redirect to clearnet"));
 	}
 
-	## Cookies are easy. We do not use them here.
-        if (req.http.cookie == "") {
-                unset req.http.cookie;
-        }
+	## Strip a trailing ? if it exists 
+	if (req.url ~ "\?$") {
+		set req.url = regsub(req.url, "\?$", "");
+	}
 
         ## Implementing websocket support
         if (req.http.Upgrade ~ "(?i)websocket") {
@@ -126,6 +233,11 @@ sub vcl_recv {
         # Otherwise everything will miss
         if (req.http.Cache-Control ~ "no-cache" && req.http.X-Bypass != "1" && req.http.Cookie) {
                 set req.hash_always_miss = true;
+        }
+
+        ## Cookies are easy. We do not use them here.
+        if (req.http.cookie == "") {
+                unset req.http.cookie;
         }
 
         ## .well-known API route should not be cached
@@ -140,9 +252,6 @@ sub vcl_recv {
         if (req.url ~ "\.(?:png|jpg|jpeg|webp|gif|css|js|woff2?)\?.*") {
                 set req.url = regsub(req.url, "\?.*", "");
         }
-
-	## My sites don't use lang
-	unset req.http.Accept-Language;
 
         ## Cache all others requests if they reach this point.
         # I'm still thinking if bypassing in-build logic this way is a smart move.
@@ -170,6 +279,21 @@ sub vcl_pipe {
 }
 
 
+
+################vcl_hash##################
+#
+sub vcl_hash {
+
+	## Return of User-Agent, but without caching
+	# Now I can send User-Agent to backend for 404 logging etc.
+	# Vary must be cleaned of course
+	if (req.http.x-agent) {
+		set req.http.User-Agent = req.http.x-agent;
+		unset req.http.x-agent;
+	}
+
+# The end of hashing
+}
 ################vcl_pass################
 #
 
@@ -235,6 +359,14 @@ sub vcl_backend_response {
         ## Let's create a couple helpful tag'ish
         set beresp.http.x-url = bereq.url;
         set beresp.http.x-host = bereq.http.host;
+
+	## Backend is down, stop caching but using ttl+grace instead
+	if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
+		if (bereq.is_bgfetch) {
+			return(abandon);
+		}
+		set beresp.uncacheable = true;
+	}
 
         # There is no HSTS or Secure-flags in onion
         unset beresp.http.Strict-Transport-Security;
@@ -316,9 +448,6 @@ sub vcl_backend_response {
                 }
         }
 
-        ## Unset Accept-Language, if backend gave one. I still want to keep it outside cache.
-        unset beresp.http.Accept-Language;
-
         ## Unset the old pragma header
         # Unnecessary filtering 'cos Varnish doesn't care of pragma, but it is ugly in headers
         # AFAIK WordPress doesn't use Pragma, so this is unnecessary here.
@@ -334,11 +463,16 @@ sub vcl_backend_response {
 
 sub vcl_deliver {
 
-	## Helping the server to stsy on onion side
+	## Helping the server to stay on onion side
 	if (req.http.X-Pseudo) {
 		set resp.http.X-Onion = "1";
 	} else {
 		unset resp.http.X-Onion;
+	}
+
+	## Damn, backend is down (or the request is not allowed; almost same thing)
+	if (resp.status == 503) {
+		return(restart);
 	}
 
 	## Hit counter
@@ -368,12 +502,22 @@ sub vcl_deliver {
         unset resp.http.X-dlm-no-waypoints;
         unset resp.http.X-UA-Compatible;
 	unset resp.http.X-Cache-Tags;
+	unset resp.http.Expires
 
         ## Vary to browser
         set resp.http.Vary = "Accept-Encoding";
 
         ## Origin should send to browser
         set resp.http.Vary = resp.http.Vary + ",Origin";
+
+	## Return of lang
+	set resp.http.Accept-Language = std.tolower(req.http.Accept-Language);
+	unset req.http.Accept-Language;
+	if (req.http.x-language ~ "fi") {
+		set req.http.x-language = "fi";
+	} else {
+		unset req.http.x-language;
+	}
 
 # The end here
 }
