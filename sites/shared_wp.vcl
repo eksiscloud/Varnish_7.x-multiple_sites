@@ -958,24 +958,23 @@ sub vcl_backend_response {
         unset beresp.http.Accept-Language;
 
         ## Show Onion-Location
-        if (bereq.method == "GET" && beresp.status == 200 &&
-            beresp.http.Content-Type ~ "(?i)text/html" &&
-            bereq.url !~ "(?i)wp-admin|wp-login\.php|/cart|/checkout|/account") {
+	# I took easy route here and I don't filter using urls. Admin etc. dynamic ones never gets here.
+        if (bereq.method == "GET" && beresp.status == 200 && beresp.http.Content-Type ~ "(?i)text/html") {
             if (bereq.http.host ~ "(?i)^www\.eksis\.one$") {
                 set beresp.http.Onion-Location =
-                "http://rfuwrkgfnbdb57mdk7p3gvwehcrzewoqojramfhux7fal7l7bhvxzkqd.onion" + bereq.url;
+                "http://eksiszkream6iqtwr5ci3vdhorkonagudym25anokjvmcbayqozg77yd\.onion" + bereq.url;
             }
             if (bereq.http.host ~ "(?i)^jagster\.eksis\.one$") {
                 set beresp.http.Onion-Location = 
-                "http://m7exyvudxph6a4ooxyips6ujx6dhyoxa6e5kb7xo76nzrapubndka2id.onion" + bereq.url;
+                "http://jgstry73xknoex3jfsqo5qaw2x7t4eb5chzu5hun4tym5qp2zcb22jqd.onion" + bereq.url;
             }
             if (bereq.http.host ~ "(?i)^www\.katiska\.eu$") {
                 set beresp.http.Onion-Location = 
-                "http://tf4yktl7spk5xdaon67b7zpa3jffzba2g2xu5l3k5ipeg5rdzq2wqhad.onion" + bereq.url;
+                "http://katiskabdnj2wco52mqtv6qyhqq6q7ltshe74za46rdot2pnplf34gad.onion" + bereq.url;
             }
             if (bereq.http.host ~ "(?i)^www\.poochierevival\.info$") {
                 set beresp.http.Onion-Location = 
-                "http://pdb77kdgubijdocwbizyhi7iawcr3vnwsdiv5kwabua2rgvy2b7py2yd.onion" + bereq.url;
+                "http://poochyuri3luo7rlagmonzisaq34c6vul3a6fj2rwc7vfnq7gajbmfad.onion" + bereq.url;
             } 
         }
 

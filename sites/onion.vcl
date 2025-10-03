@@ -72,13 +72,13 @@ sub vcl_recv {
 	unset req.http.X-Redirect-Target;
 
 	## This makes filtering little bit easier
-	if (req.http.host ~ "^rfuwrkgfnbdb57mdk7p3gvwehcrzewoqojramfhux7fal7l7bhvxzkqd\.onion") {
+	if (req.http.host ~ "^eksiszkream6iqtwr5ci3vdhorkonagudym25anokjvmcbayqozg77yd\.onion") {
 		set req.http.X-Pseudo = "eksis";
-	} else if (req.http.host ~ "^m7exyvudxph6a4ooxyips6ujx6dhyoxa6e5kb7xo76nzrapubndka2id\.onion") {
+	} else if (req.http.host ~ "^jgstry73xknoex3jfsqo5qaw2x7t4eb5chzu5hun4tym5qp2zcb22jqd\.onion") {
 		set req.http.X-Pseudo = "jagster";
-	} else if (req.http.host ~ "^tf4yktl7spk5xdaon67b7zpa3jffzba2g2xu5l3k5ipeg5rdzq2wqhad\.onion") {
+	} else if (req.http.host ~ "^katiskabdnj2wco52mqtv6qyhqq6q7ltshe74za46rdot2pnplf34gad\.onion") {
 		set req.http.X-Pseudo = "katiska";
-	} else if (req.http.host ~ "^pdb77kdgubijdocwbizyhi7iawcr3vnwsdiv5kwabua2rgvy2b7py2yd\.onion") {
+	} else if (req.http.host ~ "^poochyuri3luo7rlagmonzisaq34c6vul3a6fj2rwc7vfnq7gajbmfad\.onion") {
 		set req.http.X-Pseudo = "poochie";
 	}
 
